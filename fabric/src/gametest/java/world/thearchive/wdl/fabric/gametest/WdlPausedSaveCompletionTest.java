@@ -15,12 +15,8 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * Regression guards for the paused-replay strand, where the game tick is suspended but the client still drains its task
- * queue: a completed background save must reach IDLE on the client thread via the marshaled poke even when the
- * controller is never ticked, a nothing-captured finish must complete through its inline poke on the same route, and
- * the pause-menu button must open the download screen on the click rather than through the next-tick deferral. The
- * driver owns its own controller, separate from the production singleton, so withholding the driver's tick isolates the
- * poke as the only route to IDLE.
+ * The driver owns its own controller, separate from the production singleton, so withholding the driver's tick isolates
+ * the poke as the only route to IDLE.
  */
 public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
     @Override
@@ -32,7 +28,6 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
         }
     }
 
-    /** A real recorded capture: the writer completes off-thread and the marshal hands the poke back. */
     private void asyncSaveCompletesWithoutTick(ClientGameTestContext context) {
         DownloadTarget target = new DownloadTarget("wdl-paused-save", "wdl-paused-save", DownloadMode.NEW);
         CaptureDriver driver = CaptureDriver.start(context, target, WdlConfig.DEFAULTS);
@@ -44,11 +39,6 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
         assertPokeRanOnTheClientThread(context, driver, "the async save completion poke");
     }
 
-    /**
-     * A capture stopped with zero recorded ticks: no chunk is captured, so finish() short-circuits before it builds a
-     * writer and runs the poke inline. Without that inline poke the controller has no route out of SAVING at all, since
-     * this driver is never ticked.
-     */
     private void nothingCapturedCompletesWithoutTick(ClientGameTestContext context) {
         DownloadTarget target = new DownloadTarget("wdl-paused-nothing", "wdl-paused-nothing", DownloadMode.NEW);
         CaptureDriver driver = CaptureDriver.start(context, target, WdlConfig.DEFAULTS);
@@ -60,10 +50,8 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
     }
 
     /**
-     * The pause-menu button must open the download screen during the click, not arm the next-tick deferral, since a
-     * suspended tick would never consume it. The harness runs no client tick between two consecutive client hand-offs,
-     * so the screen being live on the call right after the click is exactly the inline-open claim: a deferred open
-     * would still be sitting unconsumed.
+     * The harness runs no client tick between two consecutive client hand-offs, so the screen being live on the call
+     * right after the click is exactly the inline-open claim: a deferred open would still be sitting unconsumed.
      */
     private void pauseButtonOpensOnTheClick(ClientGameTestContext context) {
         context.setScreen(() -> new PauseScreen(true));
@@ -78,9 +66,7 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
     /**
      * The completion must land on the client thread, not merely produce the idle state: the state alone is
      * thread-blind, so on the async case an executor that ran the poke on the writer's background thread would still
-     * pass every state assertion. On the nothing-captured case the poke runs inline from the driver's own client
-     * hand-off, so the thread identity holds by construction and this asserts nothing beyond it; it stays there only so
-     * both cases record which thread the poke actually reached.
+     * pass every state assertion.
      */
     private void assertPokeRanOnTheClientThread(ClientGameTestContext context, CaptureDriver driver, String what) {
         Check.that(context.computeOnClient(client -> driver.completionPokeThread() == Thread.currentThread()),

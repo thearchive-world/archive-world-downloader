@@ -33,23 +33,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Villager trade axis: a villager's trade offers and trade experience reach the client only when the player opens its
- * trade menu, never in a spawn or chunk packet, so the capture drives the open to bind on the villager's UUID, stashes
- * the offers every tick the menu is open, and folds them onto the villager tag in the {@code entities/} region. Present
- * offers on disk assert the open-time capture reached disk.
- *
- * <p>The sell item of a cartographer's explorer map is the one full item stack an offer carries that a downloader has
- * to process: its {@code map_id} is session-local and would collide with a real map, so it rides the same map archive
- * every captured map takes. Vanilla streams a map's colors only for a carried map, and a trade-result item is not
- * carried, so the client never receives the offer map's picture: the archived map is faithfully blank, and only its id
- * is remapped to a collision-safe archive id. The structure marker ({@code map_decorations}) is the deliberate
- * residual, kept.
- *
- * <p>The bind resolves the entity the player clicked, latched by the loader's use hook, so the drive aims at the
- * villager, confirms the crosshair is on it, and opens it with the use key, the one path that reaches that hook. A
- * direct game-mode interact would open the same menu with no provenance and bind nothing.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlMerchantCaptureTest implements FabricClientGameTest {
     /**
@@ -70,10 +53,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 + "maxUses:12,uses:0,rewardExp:1b,priceMultiplier:0.2f,demand:0,specialPrice:0,xp:5}]}}";
     }
 
-    /**
-     * A villager kept standing after its trade menu was opened, reused by the tests here so none has to summon a second
-     * villager under the crosshair.
-     */
     private record OpenedVillager(UUID id, ChunkPos chunk, Vec3 eyes) {}
 
     @Override
@@ -88,11 +67,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /**
-     * Open a cartographer, download, and read its offers, trade experience, and the remapped explorer-map sell item
-     * back off disk. The remapped sell-map id is the end-to-end proof that the flush-time scrub and remap runs on the
-     * offer holder in production, not only in its unit test.
-     */
     private static OpenedVillager captureCartographerMapTrade(ClientGameTestContext context,
             TestServerContext server) {
         BlockPos stand = context.computeOnClient(client -> client.player.blockPosition());
@@ -114,9 +88,9 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 new DownloadTarget("wdl-merchant", "wdl-merchant", DownloadMode.NEW), WdlConfig.DEFAULTS);
         run.tick(5);
 
-        // The use key, not a direct gameMode.interact: an entity interact reaches the loader's use hook only through
-        // MC's own use-key handling, and that hook is what latches the clicked villager the bind resolves from. The
-        // screen is dismissed first, or the keybind press is swallowed.
+        // The use key, not a direct gameMode.interact: an entity interact reaches the loader's client-side use hook
+        // only through MC's own use-key handling, and that hook is what latches the clicked villager the bind resolves
+        // from. The screen is dismissed first, or the keybind press is swallowed.
         context.runOnClient(client -> {
             client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
             Check.that(isLookingAtVillager(client),
@@ -124,8 +98,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
             client.setScreen(null);
         });
         context.getInput().holdKey(options -> options.keyUse);
-        // Wait on the offers syncing into the open merchant menu, the narrowest signal the trade screen actually
-        // received them, not merely that some screen opened.
         context.waitFor(client -> client.player.containerMenu instanceof MerchantMenu merchant
                 && !merchant.getOffers().isEmpty());
         run.tick(5);
@@ -164,13 +136,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         return new OpenedVillager(villagerId, villagerChunk, villagerEyes);
     }
 
-    /**
-     * The change-gate bypass. While the trade screen is open and the player touches nothing, the villager is mutated
-     * server-side so a fresh offers packet arrives with no menu-slot interaction, and the change is asserted on disk.
-     * The merchant re-stash runs on its own per-tick path, outside the slot-keyed change gate, precisely so a
-     * no-slot-touch offers change is captured. A completed trade cannot stand in for this: inserting payment and taking
-     * the result moves the three menu slots, so the slot-keyed gate would fire anyway.
-     */
     private static void captureNoSlotTouchOffersChange(ClientGameTestContext context, TestServerContext server,
             OpenedVillager villager) {
         context.runOnClient(client -> {
@@ -197,8 +162,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         run.tick(5);
 
         // Inject a real content delta and resend it with no slot interaction: add a second offer and restock, which
-        // resends the mutated offers to the trading player. A bare restock with no delta resends nothing new, which
-        // would leave the broken version falsely green.
+        // resends the mutated offers to the trading player. A bare restock with no delta resends nothing new.
         server.runOnServer(minecraftServer -> {
             if (minecraftServer.overworld().getEntity(villager.id()) instanceof Villager trader) {
                 trader.getOffers().add(new MerchantOffer(new ItemCost(Items.EMERALD, 1),
@@ -206,7 +170,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 trader.restock();
             }
         });
-        // The two-offer state is the narrowest distinguishing signal that the resend reached the client.
         context.waitFor(client -> client.player.containerMenu instanceof MerchantMenu merchant
                 && merchant.getOffers().size() == 2);
         run.tick(5);
@@ -227,11 +190,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 "the no-slot-touch offers change was not captured: the disk holds " + recipeCount + " recipes, not 2");
     }
 
-    /**
-     * The outline rim. A tradeable villager draws an unsaved rim until its trades are captured, and a nitwit, which can
-     * never trade, never draws one, since a rim it could never clear would be a permanent false to-do. The rim clears
-     * the instant the villager's UUID enters the captured set, the same open that captures its offers.
-     */
     private static void captureOutlineRim(ClientGameTestContext context, TestServerContext server,
             OpenedVillager cartographer) {
         BlockPos stand = context.computeOnClient(client -> client.player.blockPosition());
@@ -284,16 +242,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         run.stopAndAwaitSave();
     }
 
-    /**
-     * Resume carry-forward. A resumed download that re-encounters the cartographer without re-opening it re-serializes
-     * it client-reconstructed, with no {@code Offers} and {@code Xp:0}, so the carry-forward must keep the on-disk
-     * {@code Offers} and {@code Xp} rather than let that empty node overwrite them.
-     *
-     * <p>Wounding the cartographer server-side between the two runs is a control the assertions depend on:
-     * {@code Health} is a synced field a genuine re-serialize always writes at its live value, so the wounded value on
-     * the resumed save rules out the case where the chunk was never re-captured and the old node survived untouched,
-     * which would satisfy the trade check for the wrong reason.
-     */
     private static void captureResumeCarriesTradesForward(ClientGameTestContext context, TestServerContext server,
             OpenedVillager cartographer) {
         context.runOnClient(client -> {
@@ -330,8 +278,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         Check.that(originalHealth > 0,
                 "the NEW capture recorded no plausible health for the cartographer: " + originalHealth);
 
-        // Close the menu before resuming, so the re-encounter cannot re-stash the offers from an open menu and mask
-        // the disk carry-forward this test proves.
         context.runOnClient(client -> client.player.closeContainer());
         context.waitFor(client -> client.player.containerMenu == client.player.inventoryMenu);
 
@@ -360,10 +306,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 "RESUME overwrote the cartographer's trade experience with the reconstructed Xp:0");
     }
 
-    /**
-     * The capture-entities toggle off. The whole villager-trade axis, capture and the outline rim alike, rides
-     * {@code config.captureEntities()}, so opening the cartographer with it off saves no trade offers and draws no rim.
-     */
     private static void captureTradesOffWhenEntitiesDisabled(ClientGameTestContext context, TestServerContext server,
             OpenedVillager cartographer) {
         Properties entitiesOff = new Properties();
@@ -412,7 +354,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         Check.that(!offersReachedDisk, "captureEntities off still captured the cartographer's offers to disk");
     }
 
-    /** The cartographer's entity-region node on {@code saveRoot}, failing loudly if the save lacks it. */
     private static CompoundTag readCartographerNode(Path saveRoot, OpenedVillager cartographer) {
         CompoundTag entityChunk = CaptureReadback.readEntityChunk(saveRoot, cartographer.chunk())
                 .orElseThrow(() -> new AssertionError(
@@ -424,7 +365,6 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                         + saveRoot));
     }
 
-    /** Whether some entity-rim box {@code run} draws right now intersects {@code entityId}'s live bounding box. */
     private static boolean rimmed(ClientGameTestContext context, CaptureDriver run, UUID entityId) {
         List<AABB> rims = run.entityRimBoxes();
         AABB box = context.computeOnClient(client -> {
@@ -437,27 +377,23 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         return rims.stream().anyMatch(rim -> rim.intersects(box));
     }
 
-    /** The no-trades negative fixture for the outline rim: a nitwit villager never rims, having nothing to sell. */
     private static String summonNitwit(double x, double y, double z) {
         return "summon minecraft:villager " + x + " " + y + " " + z + " {NoAI:1b,"
                 + "VillagerData:{type:\"minecraft:plains\",profession:\"minecraft:nitwit\",level:1}}";
     }
 
-    /** A villager near the player other than {@code excluding} (disambiguates the nitwit from the cartographer). */
     private static Optional<Entity> otherVillager(Minecraft client, UUID excluding) {
         return client.level.getEntities((Entity) null, client.player.getBoundingBox().inflate(8)).stream()
                 .filter(entity -> entity.getType() == EntityType.VILLAGER && !entity.getUUID().equals(excluding))
                 .findFirst();
     }
 
-    /** The cartographer summoned near the player, absent until it reaches the client. */
     private static Optional<Entity> nearbyVillager(Minecraft client) {
         return client.level.getEntities((Entity) null, client.player.getBoundingBox().inflate(6)).stream()
                 .filter(entity -> entity.getType() == EntityType.VILLAGER)
                 .findFirst();
     }
 
-    /** Whether the client's crosshair is resolved onto a villager (the merchant-bind precondition). */
     private static boolean isLookingAtVillager(Minecraft client) {
         return client.hitResult instanceof EntityHitResult entityHit
                 && entityHit.getType() == HitResult.Type.ENTITY

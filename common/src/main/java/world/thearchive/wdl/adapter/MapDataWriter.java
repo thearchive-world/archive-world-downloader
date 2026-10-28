@@ -15,29 +15,11 @@ import net.minecraft.nbt.Tag;
 
 import world.thearchive.wdl.core.AtomicFileWrite;
 
-/**
- * Writes the band-agnostic map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
- * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} via vanilla
- * {@code NbtUtils.addCurrentDataVersion} and gzips it to {@code data/<key>.dat}, the identical envelope vanilla's
- * {@code DimensionDataStorage} writes, both band-stable across the 1.21.5 codec cut. The {@code data/} surface's
- * sibling of {@link RegionChunkWriter}: only the inner {@code data} tag is per-band, this wrapper is not.
- *
- * <p>The {@code idcounts} inner tag ({@code {map: maxId}}) is band-agnostic too: the 1.21.4 {@code MapIndex} is a
- * structurally different class with no settable {@code "map"}, but the on-disk {@code {map: int}} shape is identical on
- * both bands (fixture-confirmed), so it is hand-built here rather than routed through a per-band sink.
- */
 final class MapDataWriter {
-    // 26.x renamed the map-index SavedDataType from "idcounts" to "maps/last_id" (MapIndex.TYPE), and namespacing
-    // puts it at data/minecraft/maps/last_id.dat. Band-local value in a shared file (config/band-divergence.txt).
     private static final String ID_COUNTS_KEY = "maps/last_id";
 
     private MapDataWriter() {}
 
-    /**
-     * The band-agnostic {@code idcounts} inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened
-     * world's map allocator ({@code getNextMapId} = {@code ++lastMapId}, reading this {@code "map"}) issues the next id
-     * above every captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
-     */
     public static CompoundTag serializeIdCounts(int maxId) {
         CompoundTag idCounts = new CompoundTag();
         idCounts.putInt("map", maxId);
@@ -46,9 +28,8 @@ final class MapDataWriter {
 
     /**
      * Wrap {@code dataTag} as {@code {data, DataVersion}} and gzip it to {@code dataDirectory/<key>.dat}, creating the
-     * target's parent first since {@code NbtIo.writeCompressed} opens the file without making parents. The key can name
-     * a subfolder (the 26.x {@code maps/<id>} form), so the parent is the file's own directory, not {@code
-     * dataDirectory}. The same envelope vanilla's {@code DimensionDataStorage} writes for every SavedData.
+     * target's parent first since opening the file does not make its parents. The key can name a subfolder, so the
+     * parent is the file's own directory, not {@code dataDirectory}.
      */
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
@@ -59,7 +40,7 @@ final class MapDataWriter {
     /**
      * Write {@code dataTag} to {@code dataDirectory/maps/last_id.dat} through {@link AtomicFileWrite} rather than
      * {@link #write}: losing this file restarts the reopened world's map allocator at id 0, which overwrites archived
-     * map data, and {@code NbtIo.writeCompressed} truncates its destination at open.
+     * map data, and that method truncates the file when it opens it.
      */
     public static void writeIdCounts(Path dataDirectory, Tag dataTag) throws IOException {
         ByteArrayOutputStream staged = new ByteArrayOutputStream();
@@ -74,12 +55,6 @@ final class MapDataWriter {
         return envelope;
     }
 
-    /**
-     * The {@code map} high-water recorded in an existing {@code data/minecraft/maps/last_id.dat}, or -1 when there is
-     * none. Off-mode has no manifest to persist the id floor across a resume, so it reconstructs the floor from this
-     * file (the only durable record of an imageless id that sits above the highest imaged {@code maps/<n>.dat}). Reads
-     * the same {@code {data:{map:int}}} envelope {@link #serializeIdCounts} writes, band-stable across bands.
-     */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");
         if (!Files.exists(file)) {

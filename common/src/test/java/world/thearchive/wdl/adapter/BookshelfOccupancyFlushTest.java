@@ -52,13 +52,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The wiring guard for the chiseled-bookshelf occupancy mask: the flush must read it and hand it to the writer-side
  * carry-forward for every flushed chunk, whatever the capture toggles say.
  *
- * <p>This exists because the obvious optimization is wrong in a way that reads as obviously right. The mask looks like
- * a record of what this session captured, so skipping it when container capture is off looks free. It is not: the mask
- * re-gates what an EARLIER session wrote, and an absent entry reads downstream as occupancy unknown, which carries
- * every on-disk slot back. Skipping it therefore writes a book into a slot the same chunk's own saved block-state
- * reports empty, which is invisible in the loaded world, unreachable by hand, and destroyed without a drop by the next
- * insert there. That skip was written, shipped past a green suite, and caught by review; nothing in the suite moved,
- * because every other bookshelf case drives the merge directly rather than through the flush.
+ * <p>The mask looks like a record of what this session captured, so skipping it when container capture is off looks
+ * free. It is not: the mask re-gates what an EARLIER session wrote, and an absent entry reads downstream as occupancy
+ * unknown, which carries every on-disk slot back. Skipping it therefore writes a book into a slot the same chunk's own
+ * saved block-state reports empty, which is invisible in the loaded world and destroyed without a drop by the next
+ * insert there.
  *
  * <p>Driven end to end through a real region file for that reason: the defect lives in whether the flush calls the
  * producer at all, so a test that calls the producer itself cannot see it.
@@ -94,7 +92,6 @@ class BookshelfOccupancyFlushTest {
                         + "session is not a reason to stop re-gating what an earlier one wrote");
     }
 
-    /** A captured chunk holding one chiseled bookshelf whose named slots read occupied. */
     private ChunkSnapshotSource snapshotWithShelfOccupying(int... occupied) {
         BlockState state = Blocks.CHISELED_BOOKSHELF.defaultBlockState();
         for (int slot : occupied) {
@@ -105,9 +102,8 @@ class BookshelfOccupancyFlushTest {
 
     /**
      * The bookshelf block entity as the client's own save produces it, rather than the subset this test's assertions
-     * happen to read. Vanilla writes an empty Items list and last_interacted_slot unconditionally and the chunk capture
-     * adds keepPacked, so a fixture carrying only id and position is a shape production never emits, and a later change
-     * that told an empty Items apart from an absent one would pass here and fail in the world.
+     * happen to read. Vanilla writes an empty Items list and {@code last_interacted_slot} unconditionally and the chunk
+     * capture adds {@code keepPacked}.
      */
     private CompoundTag freshShelfBlockEntity() {
         return BlockEntityFixtures.savedBlockEntity(
@@ -151,8 +147,8 @@ class BookshelfOccupancyFlushTest {
     }
 
     /**
-     * A session with container capture OFF, which is the configuration under test: the interaction recognizer is
-     * absent, so nothing this session does can capture a bookshelf, and the mask is needed anyway.
+     * A session with container capture OFF: the interaction recognizer is absent, so nothing this session does can
+     * capture a bookshelf, and the mask is needed anyway.
      */
     private static LiveCaptureSession containersOffSession(Path configDirectory) {
         Properties properties = new Properties();

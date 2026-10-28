@@ -45,7 +45,7 @@ class PlayerProgressWriterTest {
 
     @Test
     void aNullProgressIsNoop(@TempDir Path saveRoot) {
-        PlayerProgressWriter.write(saveRoot, null); // disconnect-flush path
+        PlayerProgressWriter.write(saveRoot, null);
         assertFalse(Files.exists(saveRoot.resolve("players").resolve("advancements")));
         assertFalse(Files.exists(saveRoot.resolve("players").resolve("stats")));
     }
@@ -60,7 +60,6 @@ class PlayerProgressWriterTest {
 
         assertTrue(Files.isRegularFile(saveRoot.resolve("players").resolve("advancements").resolve(UUID_A + ".json")),
                 "fail-soft: the advancements surface still landed despite the stats IO failure");
-        // And the call returned normally (no throw); reaching this line is the assertion.
     }
 
     @Test

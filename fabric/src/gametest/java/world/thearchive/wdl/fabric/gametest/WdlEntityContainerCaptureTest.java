@@ -27,18 +27,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Entity-borne container axis: a chest minecart's contents reach the {@code entities/} region only when the player
- * opens it. Like a block container, the vehicle's {@code Items} never arrive in a spawn or chunk packet over a
- * connection; they sync into the open menu's slots, so the capture must drive the open to bind (on the entity's UUID)
- * and record them, and the merge folds them onto the matching entity tag. The minecart itself is captured through the
- * same prime/packet path the entity axis proves, so a present item asserts the entity-borne open reached disk.
- *
- * <p>The bind in {@code LiveCaptureSession.captureOpenContainer} resolves the entity the player CLICKED, latched by the
- * loader's use hook, so the drive aims at the minecart, confirms the crosshair is on it, and opens it with the use key,
- * the one path that reaches that hook. The second scenario is that rule's negative: the same minecart opened with no
- * provenance at all must capture nothing.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
     @Override
@@ -70,10 +58,10 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                     WdlConfig.DEFAULTS);
             run.tick(5);
 
-            // The use key, not a direct gameMode.interact: an entity interact reaches the loader's use hook only
-            // through MC's own use-key handling, and that hook is what latches the clicked entity the bind
-            // resolves from. A direct call opens the same menu but leaves the open unattributed, which binds
-            // nothing. The screen is dismissed first, or the keybind press is swallowed.
+            // The use key, not a direct gameMode.interact: an entity interact reaches the loader's client-side use hook
+            // only through MC's own use-key handling, and that hook is what latches the clicked entity the bind
+            // resolves from. A direct call opens the same menu but leaves the open unattributed, which binds nothing.
+            // The screen is dismissed first, or the keybind press is swallowed.
             context.runOnClient(client -> {
                 client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(isLookingAtVehicle(client),
@@ -108,14 +96,6 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /**
-     * Second scenario: an open no click accounts for binds nothing, even with a bindable vehicle under the crosshair.
-     * Interacting through the game mode directly reaches neither the use key nor the loader's use hook, so the menu
-     * opens with no provenance, which is what a server-opened GUI looks like to the client. The crosshair is
-     * deliberately left on the minecart whose menu it is, the coincidence the old fallback bound on: where the player
-     * looks is not evidence of what opened, and a capture here is a mis-bind waiting for the two slot counts to
-     * coincide.
-     */
     private static void captureUnattributedOpenBindsNothing(ClientGameTestContext context, UUID cartId,
             ChunkPos cartChunk) {
         context.runOnClient(client -> {
@@ -150,12 +130,9 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * Third scenario, the corruption guard: an open with no provenance is not the ridden vehicle's, even though the
-     * ridden vehicle is the one thing on screen that could plausibly have opened it. Riding a chest boat, the player
-     * opens a chest minecart through a path that latches nothing, and both containers hold 27 slots, so the slot-count
-     * guard cannot separate them: a claim here writes the minecart's contents into the boat, which is where the boat's
-     * own key-open would have gone. The ridden boat saves as the player's {@code RootVehicle} in level.dat, so that is
-     * where a claim would show up.
+     * Riding a chest boat, the player opens a chest minecart through a path that latches nothing, and both containers
+     * hold 27 slots, so the slot-count guard cannot separate them: a claim here writes the minecart's contents into the
+     * boat, which is where the boat's own key-open would have gone.
      */
     private static UUID captureUnattributedOpenAboardChestBoat(ClientGameTestContext context,
             TestServerContext server, BlockPos stand, Vec3 cartCenter, UUID cartId) {
@@ -166,16 +143,13 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         double boatX = stand.getX() + 0.5;
         double boatZ = stand.getZ() + 0.5;
         server.runCommand("summon minecraft:oak_chest_boat " + boatX + " " + stand.getY() + " " + boatZ);
-        // Both the wait and the crosshair predicate name the boat's own type and then its own identity, never
-        // "any container vehicle": the chest minecart from the earlier scenarios is one too and is where the
-        // crosshair was left, so a loose predicate is satisfied before the boat has even arrived, and the mount
-        // interact then lands on the minecart, which opens rather than boards. The run dies later on an
-        // anonymous timeout that reads as infrastructure flake rather than as a mis-aimed drive.
+        // Both the wait and the crosshair predicate name the boat's own type and then its own identity, never "any
+        // container vehicle": the chest minecart from the earlier scenarios is one too, so a loose predicate is
+        // satisfied before the boat has even arrived.
         context.waitFor(client -> nearbyChestBoat(client).isPresent());
         UUID boatId = context.computeOnClient(client -> nearbyChestBoat(client).orElseThrow().getUUID());
         ContainerDriver.aimEyesAt(context, new Vec3(boatX, stand.getY() + 0.3, boatZ));
         ContainerDriver.awaitCrosshair(context, client -> isLookingAt(client, boatId), "chest boat " + boatId);
-        // Not sneaking, so the interact boards the boat rather than opening its chest.
         context.runOnClient(client -> client.gameMode.interact(client.player,
                 ((EntityHitResult) client.hitResult).getEntity(), (EntityHitResult) client.hitResult,
                 InteractionHand.MAIN_HAND));
@@ -208,17 +182,6 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         return boatId;
     }
 
-    /**
-     * Fourth scenario, the positive the ridden-vehicle axis exists for: the boat the player rides IS captured when the
-     * client asks to open it. The request is what the capture observes, so the drive sends exactly the request
-     * vanilla's inventory key sends and presses no key at all. That distinction is the whole point: a request the
-     * client sent while no key state was sampled is precisely the case a key poll misses, and it is the routine one,
-     * since a tap shorter than a client tick leaves the key down at no tick boundary while vanilla still opens the
-     * boat.
-     *
-     * <p>The crosshair is left wherever the previous scenario put it, on the minecart, so a bind that reads the view
-     * rather than the request would land on the wrong vehicle and fail the same assertion.
-     */
     private static void captureRiddenChestBoatOnItsOpenRequest(ClientGameTestContext context,
             TestServerContext server, UUID boatId) {
         context.runOnClient(client -> {
@@ -254,21 +217,18 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                 "the ridden chest boat's planted item is absent from its captured Items: " + boatItems);
     }
 
-    /** The chest boat summoned at the player's feet, absent until it reaches the client. */
     private static Optional<Entity> nearbyChestBoat(Minecraft client) {
         return client.level.getEntities((Entity) null, client.player.getBoundingBox().inflate(4)).stream()
                 .filter(entity -> entity.getType() == EntityType.OAK_CHEST_BOAT)
                 .findFirst();
     }
 
-    /** Whether the crosshair is resolved onto the entity with {@code uuid}. */
     private static boolean isLookingAt(Minecraft client, UUID uuid) {
         return client.hitResult instanceof EntityHitResult entityHit
                 && entityHit.getType() == HitResult.Type.ENTITY
                 && entityHit.getEntity().getUUID().equals(uuid);
     }
 
-    /** Whether the client's crosshair is resolved onto a container vehicle (the entity-bind precondition). */
     private static boolean isLookingAtVehicle(Minecraft client) {
         return client.hitResult instanceof EntityHitResult entityHit
                 && entityHit.getType() == HitResult.Type.ENTITY

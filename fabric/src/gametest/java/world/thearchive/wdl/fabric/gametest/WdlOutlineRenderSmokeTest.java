@@ -14,14 +14,6 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.core.RimFace;
 
-/**
- * The render-draw smoke for the outline: the capture gametests record on their own controller, so the production render
- * (which gates on the static controller being recording) never reaches the per-band rim draw in those runs. This test
- * exercises {@link RimRendererImpl} directly in a real render frame, so a draw-side crash (a missing vertex element, a
- * bad pipeline) fails here instead of only in a live client run. It draws the four edges of one face through a real
- * {@code lines()} buffer; a frame that survives means the vertex format was written completely. The visual correctness
- * of the rim is not exercised headless.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlOutlineRenderSmokeTest implements FabricClientGameTest {
     private static volatile boolean drawTestRim;
@@ -29,7 +21,6 @@ public class WdlOutlineRenderSmokeTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         RimRenderer rimRenderer = new RimRendererImpl();
-        // Registered once, gated by the armed flag, so it draws only during this test and no-ops in every other.
         LevelRenderEvents.BEFORE_GIZMOS.register(worldContext -> {
             Minecraft client = Minecraft.getInstance();
             if (!drawTestRim || client.level == null || client.player == null) {
@@ -48,7 +39,7 @@ public class WdlOutlineRenderSmokeTest implements FabricClientGameTest {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
             drawTestRim = true;
             for (int frame = 0; frame < 10; frame++) {
-                context.waitTick(); // each rendered frame fires the draw; a vertex-format crash kills it here
+                context.waitTick();
             }
             drawTestRim = false;
             Check.that(context.computeOnClient(client -> client.level != null),

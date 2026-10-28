@@ -15,12 +15,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
-/**
- * The gate's own guard. A fidelity check nobody has watched reject anything is not known to reject anything, and one
- * that stops rejecting is indistinguishable from one that never fired, so each case here hands {@link FixtureFidelity}
- * a fixture hand-written in the shape that produced the defects this exists for and asserts it is refused, naming the
- * key.
- */
 class FixtureFidelityTest {
     private static final UUID VEHICLE = new UUID(0x1111_1111_1111_1111L, 0x2222_2222_2222_2222L);
 
@@ -29,7 +23,6 @@ class FixtureFidelityTest {
         TestRegistries.frozen();
     }
 
-    /** The hand-built entry at the root of the recorded defect: no {@code "Slot"}, so every entry decodes to 0. */
     private static CompoundTag handBuiltEntry(String itemId, boolean withSlot, boolean withCount) {
         CompoundTag entry = new CompoundTag();
         if (withSlot) {
@@ -69,8 +62,6 @@ class FixtureFidelityTest {
 
     @Test
     void twoItemEntriesWithoutSlotCollapseOntoOneAndAreRejected() {
-        // The exact defect shape: a slot-aware rule sees one entry where the fixture claims two, so a case
-        // written to distinguish slots proves nothing and passes under a deliberately broken production line.
         String message = reject(() -> FixtureFidelity.assertItemsHolderShape(
                 holderOf(handBuiltEntry("minecraft:diamond", false, true),
                         handBuiltEntry("minecraft:emerald", false, true))));
@@ -152,8 +143,6 @@ class FixtureFidelityTest {
 
     @Test
     void theChunkChokePointStampsTheKeyThatOnlyTheChunkLayerWrites() {
-        // The block entity's own save never writes keepPacked, so it is exempt from the round trip yet still part
-        // of what lands on disk beside every saved block entity.
         CompoundTag chunkTag = BlockEntityFixtures
                 .chunkTagWith(BlockEntityFixtures.blockEntity("minecraft:chest", 1, 64, 1));
         assertEquals(false,

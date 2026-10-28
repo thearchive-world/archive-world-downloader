@@ -19,11 +19,8 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * Double-chest container axis: a large chest binds BOTH halves' block positions, and the 54-slot menu's two 27-slot
- * halves merge into their own chest block entities. Distinct items are planted in each half (a diamond in the LEFT
- * half, an emerald in the RIGHT) so a passing run proves each half landed on its own block, not one half copied to
- * both. The contents arrive client-side only through the open menu, so the drive opens one half; opening either binds
- * the double.
+ * Distinct items are planted in each half (a diamond in the LEFT half, an emerald in the RIGHT) so a passing run proves
+ * each half landed on its own block, not one half copied to both.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlDoubleChestCaptureTest implements FabricClientGameTest {
@@ -75,7 +72,6 @@ public class WdlDoubleChestCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /** Set one half of the double at {@code pos} with the given chest type and plant a distinctive item in it. */
     private static void placeHalf(TestServerContext server, BlockPos pos, String type, String itemId) {
         String at = pos.getX() + " " + pos.getY() + " " + pos.getZ();
         server.runCommand("setblock " + at + " minecraft:chest[facing=north,type=" + type + "]");

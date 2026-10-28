@@ -15,12 +15,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Player-data axis: the local player's inventory and position reach {@code players/data/<uuid>.dat}, which at 26.x is
- * the captured player's home while level.dat only stamps its {@code singleplayer_uuid}. The given item arrives at the
- * client over the container-set-slot sync, and the capture assembles the live client player to disk at finish, so a
- * present item proves the whole client-player-to-disk path.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlPlayerDataCaptureTest implements FabricClientGameTest {
     @Override
@@ -41,7 +35,7 @@ public class WdlPlayerDataCaptureTest implements FabricClientGameTest {
             List<CompoundTag> inventory = player.getListOrEmpty("Inventory").compoundStream().toList();
             boolean hasDiamond = inventory.stream()
                     .anyMatch(item -> item.getString("id").orElse("").equals("minecraft:diamond"));
-            Check.that(hasDiamond, "the given diamond is absent from the captured Player Inventory: "
+            Check.that(hasDiamond, "the given diamond is absent from the captured player's Inventory: "
                     + inventory.stream().map(item -> item.getString("id").orElse("?")).toList());
         }
     }

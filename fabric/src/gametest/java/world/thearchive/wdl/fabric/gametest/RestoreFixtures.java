@@ -16,23 +16,14 @@ import java.util.stream.Stream;
 
 import world.thearchive.wdl.core.export.RestoreOperation;
 
-/**
- * Builds the on-disk shapes the restore-flow gametests drive against: a singleplayer taint marker over a real captured
- * folder, a foreign occupant (a husk directory or a stray file at a download's name), and a torn restore attempt under
- * the saves temporary root with the live folder moved aside. The real managed folders and their clean export zips come
- * from a driven capture; this only mutates them into the pre-restore states the cases assert against. Plain java.nio,
- * so it never re-implements the layout the production code owns.
- */
 final class RestoreFixtures {
-    /** The vanilla singleplayer lock file whose presence a folder-open probe treats as a live world. */
     static final String SESSION_LOCK = "session.lock";
 
     private RestoreFixtures() {}
 
     /**
      * Mark {@code folder} as singleplayer-opened by writing a non-empty player-data directory, the server-only artifact
-     * {@link world.thearchive.wdl.core.browse.SinglePlayerTaint} classifies as tainted. The clean export zip captured
-     * beforehand is untouched, so it stays a valid restore source.
+     * {@link world.thearchive.wdl.core.browse.SinglePlayerTaint} classifies as tainted.
      */
     static void taint(Path folder) {
         try {
@@ -44,7 +35,6 @@ final class RestoreFixtures {
         }
     }
 
-    /** Replace whatever is at {@code path} with a husk directory holding only a {@code session.lock}. */
     static void huskWithSessionLock(Path path) {
         deleteRecursively(path);
         try {
@@ -55,7 +45,6 @@ final class RestoreFixtures {
         }
     }
 
-    /** Replace whatever is at {@code path} with a single regular file, a foreign occupant that is not a directory. */
     static void strayFile(Path path) {
         deleteRecursively(path);
         try {
@@ -66,10 +55,8 @@ final class RestoreFixtures {
     }
 
     /**
-     * Craft a torn restore attempt for {@code folderName} under the saves temporary root: an attempt directory with its
-     * {@code attempt.lock}, the download folder moved into the attempt's {@code aside}, and an empty {@code install}.
      * The live folder is left absent, the state a client that quit mid-swap leaves behind and the next sweep rolls
-     * back. Returns the attempt directory.
+     * back.
      */
     static Path craftTornAttempt(Path savesDirectory, String folderName) {
         try {
@@ -87,9 +74,7 @@ final class RestoreFixtures {
     }
 
     /**
-     * Craft a torn attempt whose kept-aside carries a locked {@code session.lock}, so a sweep defers it rather than
-     * moving it back and {@link RestoreOperation.RestoreSweep#hasWork} stays true while the returned lock is held. The
-     * live folder is left absent. The caller closes the returned handle to release the lock.
+     * Craft a torn attempt whose kept-aside carries a locked session.lock, so a sweep defers it.
      */
     static LockedAside craftLockedTornAttempt(Path savesDirectory, String folderName) {
         try {
@@ -125,7 +110,6 @@ final class RestoreFixtures {
         }
     }
 
-    /** A crafted torn attempt whose kept-aside session lock the test holds open; {@link #close} releases it. */
     static final class LockedAside implements AutoCloseable {
         private final Path attempt;
         private final FileChannel channel;
@@ -146,7 +130,7 @@ final class RestoreFixtures {
             try {
                 lock.release();
             } catch (IOException e) {
-                // Best effort: a released or invalid lock on teardown is not a test failure.
+                // Best effort.
             }
             try {
                 channel.close();

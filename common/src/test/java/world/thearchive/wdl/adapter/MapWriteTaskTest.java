@@ -24,17 +24,10 @@ import org.slf4j.LoggerFactory;
 import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The one map data write task, shared by the on-sight streaming arm and the finish batch. Pinned here because a task
- * that stops counting its own failures lets a download that lost maps be reported clean: the count feeds the
- * partial-finish predicate that stamps the completion record. Its other half is the voice: a task that logs a loss
- * itself instead of through the voice it is handed takes the stack bound with it, and the caller holding that voice for
- * the whole download is the only thing standing between a bad save folder and a stack per lost map.
- */
 class MapWriteTaskTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.frozen();
     }
 
     private static CaptureLossLog lossLog() {
@@ -65,8 +58,7 @@ class MapWriteTaskTest {
 
     @Test
     void countsEveryFailedWriteAndNeverThrows(@TempDir Path save) throws Exception {
-        // createDirectories throws FileAlreadyExistsException when a regular file sits at the directory path:
-        // the deterministic IO failure this task must absorb and count rather than propagate.
+        // createDirectories throws FileAlreadyExistsException when a regular file sits at the directory path.
         Path dataDirectory = save.resolve("data");
         Files.writeString(dataDirectory, "not a directory");
         AtomicInteger failures = new AtomicInteger();
@@ -101,9 +93,8 @@ class MapWriteTaskTest {
 
     @Test
     void countsAnUnexpectedRuntimeFailure(@TempDir Path save) throws Exception {
-        // A NUL byte is rejected by the Unix path parser the suite runs on, so resolving the target file name
-        // throws InvalidPathException before any directory is created. That is the RuntimeException half of the
-        // catch, reached deterministically.
+        // A NUL byte is rejected by the Unix path parser the suite runs on, so resolving the target file name throws
+        // InvalidPathException before any directory is created.
         Path dataDirectory = save.resolve("data");
         AtomicInteger failures = new AtomicInteger();
 

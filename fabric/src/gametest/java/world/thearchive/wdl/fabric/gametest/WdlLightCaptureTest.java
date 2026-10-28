@@ -26,12 +26,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Light capture in three scenarios: (1) end to end, a captured chunk writes {@code isLightOn=true} with settled block
- * light, a sky layer, and walked-square flag consistency; (2) the quiescence drain, a client-side block edit followed
- * by a codec snapshot in the same client-thread callback (no frame between, so only capture's own drain can propagate
- * the new light); (3) the gate, a column with light disabled snapshots light-free with {@code lightCorrect=false}.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlLightCaptureTest implements FabricClientGameTest {
     @Override
@@ -39,7 +33,6 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
             TestServerContext server = fixture.server();
 
-            // Scenario 1: on-disk shape through the full pipeline.
             ChunkPos playerChunk = context.computeOnClient(client -> client.player.chunkPosition());
             BlockPos lamp = new BlockPos(playerChunk.getMinBlockX() + 8, 80, playerChunk.getMinBlockZ() + 8);
             server.runOnServer(minecraftServer -> minecraftServer.overworld().setBlock(lamp,
@@ -74,10 +67,6 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
                 }
             }
 
-            // Scenario 2: the drain. A client-side edit marks light work (checkBlock) but nothing
-            // drains it inside this callback; only capture()'s own hasLightWork/runLightUpdates can
-            // propagate the new source before the read. Runs after the save is finished, so the
-            // client-only desync never reaches the artifact.
             BlockPos lamp2 = new BlockPos(playerChunk.getMinBlockX() + 2, 80, playerChunk.getMinBlockZ() + 2);
             int snapshotLevel = context.computeOnClient(client -> {
                 ChunkCodec codec = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
@@ -91,8 +80,6 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
                     "undrained same-callback edit: snapshot must store the new source's light 15, got "
                             + snapshotLevel);
 
-            // Scenario 3: the gate. With the column's light disabled the snapshot must fall back:
-            // no layers, lightCorrect=false. Restore the bit afterward.
             boolean gateFellBack = context.computeOnClient(client -> {
                 ChunkCodec codec = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
                         .findFirst().orElseThrow().chunkCodec();
@@ -118,7 +105,6 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
                         || section.getByteArray("SkyLight").isPresent());
     }
 
-    /** The snapshot's stored block light at {@code pos}, or -1 when its section carries no layer. */
     private static int snapshotBlockLight(ChunkSnapshotSource snapshot, BlockPos pos) {
         int sectionY = pos.getY() >> 4;
         return snapshot.sections().stream()

@@ -16,12 +16,6 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.client.WdlOutlineRenderer;
 
-/**
- * The NeoForge half of the outline render seam, the analog of {@code FabricOutlineRegistrar}. It stashes the live view
- * frustum on the public level-render-state extraction event and draws after the translucent-blocks stage, both
- * mixin-free, on the game event bus. A missing stash skips the draw rather than dereferencing null. The lines batch is
- * flushed explicitly, since nothing after this stage flushes it.
- */
 final class NeoForgeOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
     private @Nullable Frustum stashedFrustum;

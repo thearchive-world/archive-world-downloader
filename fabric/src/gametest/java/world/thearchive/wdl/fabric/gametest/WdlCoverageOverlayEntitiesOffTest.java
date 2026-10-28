@@ -11,18 +11,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Guardrail for the entities-off overlay: with {@code captureEntities} off, no entity is ever captured, so the covered
- * read must draw every saved chunk suspect, never the cold-start single-tone mirror (which would claim entities were
- * saved in a mode where none are). The cold-start mirror exists to hide a spurious suspect boundary before the send
- * range is known; that premise does not hold when entity capture itself is off, so the covered set must be empty
- * regardless of how much terrain is saved.
- *
- * <p>It then switches the setting back on mid-download, which nothing stops a player doing from the pause menu. The
- * session latched entity capture off at start and goes on capturing no entity at all, so the covered set must stay
- * empty: a download that captures zero entities may never report full entity coverage because the settings changed
- * under it.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayEntitiesOffTest implements FabricClientGameTest {
     @Override
@@ -36,7 +24,7 @@ public class WdlCoverageOverlayEntitiesOffTest implements FabricClientGameTest {
             CaptureDriver driver = CaptureDriver.start(context,
                     new DownloadTarget("wdl-entities-off", "wdl-entities-off", DownloadMode.NEW),
                     WdlConfig.parse(entitiesOff));
-            driver.tick(10); // load + capture the render-distance square
+            driver.tick(10);
 
             long[] saved = driver.overlaySavedChunks(dimension);
             long[] covered = driver.overlayCoveredChunks(dimension);

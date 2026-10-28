@@ -21,7 +21,6 @@ import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.OutlineDrawSet;
 import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.OutlineRim;
-import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.BrandColors;
 import world.thearchive.wdl.core.CaptureState;
@@ -29,21 +28,12 @@ import world.thearchive.wdl.core.RimFace;
 import world.thearchive.wdl.core.TimingWindow;
 
 /**
- * The band-agnostic outline cull: each frame it iterates the populated sections of the draw-set, frustum-rejects whole
- * sections, and delegates the draw of each surviving rim, on the exposed face the rim carries, to the injected per-band
- * {@link RimRenderer}. Per-frame cost scales with on-screen sections, not the total tracked set. The draw is gated on
- * the live capture being recording, so the to-do rims stop the instant the capture ends even before the next
- * maintenance tick clears the draw-set.
- *
- * <p>The renderer reads no MC world state: each rim's exposed face is computed and stamped on the client tick by
- * {@link OutlineTracker}, since the neighbors it seals against change only on the tick, so the per-frame path is a pure
- * section frustum cull plus the delegated draw. Its only per-frame allocation is one section box per visible section
- * for the frustum test. Runs on the render thread, the vanilla client thread.
+ * The draw is gated on the live capture being recording, so the to-do rims stop the instant the capture ends even
+ * before the next maintenance tick clears the draw-set.
  */
 public final class WdlOutlineRenderer {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    // The outlineDebugTiming window, in frames: the rolling render-thread cost is read from here.
     private static final int TIMING_WINDOW_FRAMES = 200;
     private static final TimingWindow renderTiming = new TimingWindow(TIMING_WINDOW_FRAMES);
     private static boolean errorLogged;
@@ -67,8 +57,6 @@ public final class WdlOutlineRenderer {
             ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = Long2ObjectMaps.fastIterator(sections);
             while (entries.hasNext()) {
                 Long2ObjectMap.Entry<List<OutlineRim>> entry = entries.next();
-                // A null frustum is a band whose loader render event exposes none (26.x fabric-api): draw every
-                // section and let the GPU clip, rather than skip the off-screen build.
                 if (frustum != null && !frustum.isVisible(sectionBox(entry.getLongKey()))) {
                     continue;
                 }
@@ -95,9 +83,7 @@ public final class WdlOutlineRenderer {
     }
 
     /**
-     * Build the per-frame render context from the loader's pose, buffers, and frustum, resolving the effective rim line
-     * width from the config scale and the band's appropriate width, then cull and draw the live set. A null frustum (a
-     * band whose loader render event no longer exposes one) draws every section, the GPU clipping off-screen.
+     * Build the per-frame render context from the loader's pose, buffers, and frustum, then cull and draw the live set.
      */
     public static void render(PoseStack pose, MultiBufferSource consumers, @Nullable Frustum frustum,
             RimRenderer rimRenderer) {
@@ -108,7 +94,6 @@ public final class WdlOutlineRenderer {
         render(context, Wdl.outlineDrawSet(), rimRenderer);
     }
 
-    /** Roll the per-frame render-thread cost into a windowed log line. */
     private static void recordRenderTiming(long elapsedNanos, int rimsDrawn, int sectionsVisible,
             int sectionsPopulated) {
         if (renderTiming.record(elapsedNanos)) {

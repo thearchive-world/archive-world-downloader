@@ -11,15 +11,9 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.OptionalLong;
 
-/**
- * The on-disk byte total of a finished save folder, summed by a {@code java.nio} tree walk. MC-free and band-agnostic.
- * A walk that fails (the folder is gone or unreadable) returns {@linkplain OptionalLong#empty() no size} rather than a
- * wrong zero, so the download screen shows no size instead of a misleading one.
- */
 public final class FolderSize {
     private FolderSize() {}
 
-    /** The total bytes of every regular file under {@code folder}, recursively; empty if the walk fails. */
     public static OptionalLong onDiskSize(Path folder) {
         final long[] total = { 0 };
         try {

@@ -23,14 +23,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the pure id-collection: {@link MapIdCollector} walks a serialized item list and collects every
- * {@code minecraft:map_id} it references, recursing into a shulker box (the {@code minecraft:container} component) and
- * a bundle (the {@code minecraft:bundle_contents} component) the way {@link ItemLocationScrub} does, and skipping
- * non-map items. Real {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive it, so
- * neither a live menu nor a {@code Level} is needed; the live {@code getMapData} resolution and the item-frame walk are
- * not exercised headless.
- */
 class MapIdCollectorTest {
     private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -58,9 +50,6 @@ class MapIdCollectorTest {
 
     @Test
     void collectsAnImagelessReferencedIdHigherThanImagedOnesForTheIdcountsFloor() {
-        // A chest map referenced but never carried (imageless) is still collected, so idcounts floors
-        // above it. Here ids 1 and 2 stand for imaged maps and 50 for the imageless chest map; the collection
-        // (hence the idcounts floor = max) must include 50, not stop at the imaged max of 2.
         Set<Integer> ids = collect(holderOf(sink, registries, filledMap(1), filledMap(2), filledMap(50)));
 
         assertEquals(Set.of(1, 2, 50), ids);

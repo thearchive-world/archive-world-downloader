@@ -6,15 +6,13 @@ package world.thearchive.wdl.core.update;
 import java.util.List;
 import java.util.Optional;
 
-/** The pure strictly-newer decision of the update check. */
 public final class LatestRelease {
     private LatestRelease() {}
 
     /**
      * The raw version number of the newest release the running client should update to, or empty. Keeps only listed
-     * release rows matching the running loader and MC version (a client-side re-filter, even though the index also
-     * filters), picks the newest by publish date with a version tie-break, and reports it only when strictly newer than
-     * {@code running}.
+     * release rows matching the running loader and MC version, picks the newest by publish date with a version
+     * tie-break, and reports it only when strictly newer than {@code running}.
      */
     public static Optional<String> newerThan(String loaderId, String mcVersion, SemVer running,
             List<Release> rows) {
