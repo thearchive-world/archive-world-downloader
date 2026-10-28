@@ -28,15 +28,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 
-/**
- * The headless guard for the chunk read-merge: {@link ChunkMerge} carries forward every interaction-captured datum (a
- * block container's {@code "Items"}, a lectern's {@code "Book"}/{@code "Page"}, a jukebox disc's {@code "RecordItem"},
- * a beehive's {@code "Bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the
- * write captured nothing of its own there, so a re-walk live-updates the terrain without wiping a chest an earlier
- * write archived, while a container this write captured is left exactly as that capture saw it. Pure
- * {@code NBTTagCompound} in/out, band-agnostic over the pre-1.18 {@code Level.TileEntities} layout, matched by
- * {@code x/y/z}.
- */
 class ChunkMergeTest {
     private static NBTTagCompound chest(int x, int y, int z, String... itemIds) {
         return container("minecraft:chest", x, y, z, itemIds);
@@ -44,8 +35,8 @@ class ChunkMergeTest {
 
     /**
      * A second container type distinct from chest, so a same-position type change can be shown; furnace here. Not
-     * trapped chest: at 1.12.2 the trapped chest hosts the same {@code TileEntityChest} class as a regular chest, so
-     * its saved {@code "id"} is the identical {@code minecraft:chest}, not a distinct type a merge could tell apart.
+     * trapped chest: the trapped chest hosts the same {@code TileEntityChest} class as a regular chest, so its saved
+     * {@code "id"} is the identical {@code minecraft:chest}, not a distinct type a merge could tell apart.
      */
     private static NBTTagCompound furnace(int x, int y, int z, String... itemIds) {
         return container("minecraft:furnace", x, y, z, itemIds);
@@ -80,8 +71,8 @@ class ChunkMergeTest {
     }
 
     private static NBTTagCompound jukeboxWithDisc(int x, int y, int z, String discId) {
-        // At 1.18.2 JukeboxBlockEntity.saveAdditional writes only RecordItem, and only when a disc is present; the
-        // IsPlaying and tick sidecars are 1.19 additions.
+        // BlockJukebox.TileEntityJukebox.writeToNBT adds only RecordItem to the base block-entity keys, and only when a
+        // disc is present; the IsPlaying and tick sidecars are later additions.
         NBTTagCompound blockEntity = jukebox(x, y, z);
         blockEntity.setTag("RecordItem", ItemFixtures.itemTag(discId));
         return blockEntity;
@@ -94,13 +85,6 @@ class ChunkMergeTest {
         return blockEntity("minecraft:ender_chest", x, y, z);
     }
 
-    /**
-     * A beehive block entity carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s own
-     * {@code CapturedBlockField.BEES} carries forward (vanilla's own {@code BeehiveBlockEntity} persists occupants
-     * under {@code "Bees"} instead, so this shape is not a real producer's output; a chunk tag built from it must go
-     * through {@link BlockEntityFixtures#malformedChunkTagWith}, not the fidelity-checked
-     * {@link BlockEntityFixtures#chunkTagWith}).
-     */
     private static NBTTagCompound beehiveWithBees(int x, int y, int z, int beeCount) {
         NBTTagCompound blockEntity = beehive(x, y, z);
         int[] ticksInHive = new int[beeCount];
@@ -123,10 +107,9 @@ class ChunkMergeTest {
     }
 
     /**
-     * The on-disk carry-forward is the last store a same-position block replacement makes stale, and the one a
-     * placement's in-memory drop cannot reach. The match is position plus block-entity type, which a same-type
-     * replacement satisfies exactly, so a chest broken and replaced without ever being opened would otherwise inherit
-     * the archived contents of the chest that stood there.
+     * The match is position plus block-entity type, which a same-type replacement satisfies exactly, so a chest broken
+     * and replaced without ever being opened would otherwise inherit the archived contents of the chest that stood
+     * there.
      */
     @Test
     void aPositionThatWasReplacedCarriesNothingForward() {
@@ -140,7 +123,6 @@ class ChunkMergeTest {
                 "and the chest now standing there stays as empty as the client saw it");
     }
 
-    /** The other half: an untouched position still carries forward, so the guard is not a blanket refusal. */
     @Test
     void aPositionNoPlacementTouchedStillCarriesForward() {
         NBTTagCompound onDisk = chunkTagWith(chest(3, 64, 7, "minecraft:diamond"));
@@ -178,7 +160,7 @@ class ChunkMergeTest {
     @Test
     void freshTerrainIsAuthoritativeForBlockEntitiesRemovedSinceThePriorSession() {
         NBTTagCompound onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond"));
-        NBTTagCompound fresh = chunkTagWith(); // the chest was broken since; fresh terrain has no block entity
+        NBTTagCompound fresh = chunkTagWith();
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -226,7 +208,7 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedJukeboxDiscIsNotGhostedIntoTheReplacementChest() {
         NBTTagCompound onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:record_cat"));
-        NBTTagCompound fresh = chunkTagWith(chest(3, 65, 4)); // a chest now stands where the jukebox was
+        NBTTagCompound fresh = chunkTagWith(chest(3, 65, 4));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -249,7 +231,6 @@ class ChunkMergeTest {
     @Test
     void aRePlacedBeehiveKeepsTheFresherOccupants() {
         NBTTagCompound onDisk = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(8, 72, 1, 3));
-        // a populated hive placed this session
         NBTTagCompound fresh = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(8, 72, 1, 1));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
@@ -260,7 +241,6 @@ class ChunkMergeTest {
 
     @Test
     void anEmptyDiskBeesListIsNotCarried() {
-        // present-but-empty "Bees" is vanilla's emptied-hive state, distinct from the key being absent
         NBTTagCompound onDisk = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(2, 64, 2, 0));
         NBTTagCompound fresh = chunkTagWith(beehive(2, 64, 2));
 
@@ -295,7 +275,7 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedContainerIsNewAndEmptyNotGhosted() {
         NBTTagCompound onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
-        NBTTagCompound fresh = chunkTagWith(furnace(10, 70, 20)); // a furnace now stands where the chest was
+        NBTTagCompound fresh = chunkTagWith(furnace(10, 70, 20));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -308,7 +288,7 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedLecternBookIsNotGhostedIntoTheReplacementChest() {
         NBTTagCompound onDisk = BlockEntityFixtures.malformedChunkTagWith(lectern(5, 64, 5, true, 7));
-        NBTTagCompound fresh = chunkTagWith(chest(5, 64, 5)); // a chest now stands where the lectern was
+        NBTTagCompound fresh = chunkTagWith(chest(5, 64, 5));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -319,8 +299,6 @@ class ChunkMergeTest {
 
     @Test
     void aRevisitReflectsPlacedBlockEntitiesAndCarriesTheSurvivingContainerForward() {
-        // A revisit re-flush drives the merge from the fresh capture: a furnace placed since the first flush is
-        // present (the change lands), and the chest that survived carries its earlier-saved contents forward.
         NBTTagCompound onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond"));
         NBTTagCompound fresh = chunkTagWith(chest(10, 70, 20), furnace(11, 70, 20));
 
@@ -344,9 +322,7 @@ class ChunkMergeTest {
         onDiskSections.appendTag(onDiskSection);
         onDisk.setTag("sections", onDiskSections);
 
-        // The fresh chunk carries its own section at the same Y with no light layers on it. Without a section
-        // there the light assertion below iterates nothing and holds for any merge at all.
-        NBTTagCompound fresh = chunkTagWith(chest(10, 70, 20)); // re-walked, gate-false: no light tags
+        NBTTagCompound fresh = chunkTagWith(chest(10, 70, 20));
         NBTTagList freshSections = new NBTTagList();
         NBTTagCompound freshSection = new NBTTagCompound();
         freshSection.setByte("Y", (byte) 0);
@@ -370,14 +346,14 @@ class ChunkMergeTest {
     @Test
     void aChunkWithNoFreshBlockEntitiesDoesNothing() {
         NBTTagCompound onDisk = chunkTagWith(chest(1, 64, 1, "minecraft:diamond"));
-        NBTTagCompound fresh = new NBTTagCompound(); // no block_entities key at all
+        NBTTagCompound fresh = new NBTTagCompound();
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
     }
 
     /**
      * A chiseled bookshelf's saved tag. No block on this band hosts the type, so it has no producer to take a shape
-     * from; the per-slot union under test is band-agnostic tag code that a save written on a later band reaches.
+     * from.
      */
     private static NBTTagCompound bookshelf(int x, int y, int z, int... slots) {
         NBTTagCompound blockEntity = unhostedBlockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, x, y, z);
@@ -408,7 +384,6 @@ class ChunkMergeTest {
         return slots;
     }
 
-    /** The same slots sorted, for the cases whose subject is membership rather than order. */
     private static List<Integer> sortedSlotsOf(NBTTagCompound blockEntity) {
         List<Integer> slots = new ArrayList<>(slotsOf(blockEntity));
         Collections.sort(slots);
@@ -429,8 +404,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfInsertUnionsWithTheBooksAlreadyOnDisk() {
-        // The bookshelf's capture unit is one slot, so the fresh side names only the book inserted since the last
-        // flush. Replacing wholesale would delete the books an earlier flush of this same download already saved.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
 
@@ -478,9 +451,6 @@ class ChunkMergeTest {
 
     @Test
     void anOnDiskBookshelfHoldingNoBooksCarriesNothingAndCountsNothing() {
-        // The union's own empty case. A shelf whose prior visit saved no book has nothing to contribute, so the
-        // carry must report that it carried nothing: counting it would tell the caller a block entity was
-        // recovered when the fresh insert is all there is.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
 
@@ -491,9 +461,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfOpenedThisWriteStillUnionsTheBooksAlreadyOnDisk() {
-        // A bookshelf reaches the same position set as an opened chest, since a confirmed insert routes to the
-        // container bundle the set is built from. Its fresh list is the one slot the player clicked, not the whole
-        // shelf, so treating the position as ground truth for every slot would drop every earlier-saved book.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
         LongSet opened = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(4, 64, 9)));
@@ -506,8 +473,6 @@ class ChunkMergeTest {
 
     @Test
     void aFreshBlockEntityWithNoCompletePositionCarriesNothing() {
-        // A position is what the merge matches on, reads occupancy under, and tests for a fresh open, so a block
-        // entity that names none is skipped whole rather than merged against a position it does not have.
         NBTTagCompound onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
         NBTTagCompound positionless = chest(10, 70, 20);
         positionless.removeTag("y");
@@ -521,8 +486,6 @@ class ChunkMergeTest {
 
     @Test
     void aPartlyEmptiedChestDoesNotResurrectTheItemsTakenOutOfIt() {
-        // The union is bookshelf-only on purpose: a chest's fresh list comes from an opened menu, which is ground
-        // truth for the whole container, so unioning it would put back what the player watched leave.
         NBTTagCompound onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
         NBTTagCompound fresh = chunkTagWith(chest(10, 70, 20, "minecraft:dirt"));
 
@@ -548,8 +511,6 @@ class ChunkMergeTest {
 
     @Test
     void anOpenAtOnePositionSaysNothingAboutItsNeighbor() {
-        // The set is spent per position, and a gate that spent it as a whole-chunk flag would drop the
-        // neighbor's archive. With contents in the exemption that cost is an un-opened container's items.
         NBTTagCompound onDisk = chunkTagWith(
                 chest(1, 64, 1, "minecraft:diamond"),
                 chest(2, 64, 2, "minecraft:emerald"));
@@ -565,9 +526,6 @@ class ChunkMergeTest {
 
     @Test
     void aReOpenedBrewingStandKeepsItsFresherState() {
-        // A brewing stand the player re-opened is captured from its menu, so its state is a real capture even where
-        // every value happens to read as the client default. Naming the position is what says so; without it
-        // the merge cannot tell a captured zero from a never-captured one and would carry the stale value.
         NBTTagCompound onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         NBTTagCompound fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 60, (byte) 0));
         LongSet reopened = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(6, 64, 6)));
@@ -595,8 +553,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookTakenOutBetweenVisitsIsNotWrittenBackIntoAnEmptySlot() {
-        // Carrying a slot the saved block-state denies puts an item in the archive that the loaded world shows
-        // nowhere, cannot be taken out by hand, and destroys without a drop on the next insert there.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
@@ -611,7 +567,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfWithNoRecordedOccupancyKeepsEveryOnDiskSlot() {
-        // The over-capture direction when the occupancy is unknown, which is what the no-argument merge means.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
 
@@ -622,12 +577,11 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfNotNamedByTheOccupancyMapKeepsEveryOnDiskSlot() {
-        // The unknown-occupancy fallback has to survive a map that names OTHER positions, which is the shape
-        // production builds: one entry per bookshelf in the chunk, nothing for a shelf whose state was unreadable.
+        // The unknown-occupancy fallback has to survive a map that names OTHER positions.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
-        occupancy.put(new BlockPos(11, 70, 2).toLong(), 0b1); // some other shelf entirely
+        occupancy.put(new BlockPos(11, 70, 2).toLong(), 0b1);
 
         assertEquals(1, ChunkMerge.merge(onDisk, fresh, occupancy, LongSets.EMPTY_SET, LongSets.EMPTY_SET));
         assertEquals(ImmutableList.of(0, 1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
@@ -636,10 +590,9 @@ class ChunkMergeTest {
 
     @Test
     void aFreshStateCaptureIsNotOverwrittenEvenWhenItsPositionWasNotNamed() {
-        // The defensive half of the scalar carry: a fresh side already holding a non-default value is a real
-        // capture whatever the position set says, and must not be replaced by the older on-disk one. Both state
-        // keys are non-default here, so nothing at all is left for the carry to do and the count says so; with
-        // one of them at its default that key carries, and the count could not tell the two halves apart.
+        // The defensive half of the scalar carry. Both state keys are non-default here, so nothing at all is left for
+        // the carry to do and the count says so; with one of them at its default that key carries, and the count could
+        // not tell the two halves apart.
         NBTTagCompound onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         NBTTagCompound fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 180, (byte) 7));
 

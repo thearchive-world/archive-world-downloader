@@ -24,13 +24,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the id remap: {@link MapIdRemap} mirrors {@link MapIdCollector} (collect becomes set),
- * rewriting every referenced {@code minecraft:map_id} to a resolver-supplied archive id across the same surfaces
- * (top-level, a shulker's {@code minecraft:container}, a bundle's {@code minecraft:bundle_contents}). Collecting after
- * the remap is the oracle: the remapped set must equal the resolver applied to the original set, proving the walk
- * touches exactly the ids the collector reads.
- */
 class MapIdRemapTest {
     private final ContainerSink sink = new ContainerSinkImpl();
 
@@ -78,7 +71,6 @@ class MapIdRemapTest {
 
     @Test
     void remapItemRewritesSingleItemInPlace() {
-        // The entry point the entity path uses for an item frame's single "Item" (not a list).
         NBTTagCompound holder = holderOf(sink, filledMap(5));
         NBTTagCompound item = (NBTTagCompound) ((NBTTagList) holder.getTag("Items")).get(0);
 

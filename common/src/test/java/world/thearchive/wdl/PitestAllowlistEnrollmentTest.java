@@ -21,19 +21,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * Keeps the PITest fidelity allowlist honest as the packages grow. The allowlist in {@code common/build.gradle.kts}
- * fails closed: a class it does not name gets no mutants, so a newly-added fidelity-critical class would silently carry
- * no mutation signal, and once a ratchet gate lands it would pass green over that unpinned code. This guard makes that
- * hole loud: every top-level {@code core/} pure-logic class (imports no {@code net.minecraft}) and every top-level
- * {@code adapter/} deterministic transform (imports {@code net.minecraft}) must be a deliberate choice, either enrolled
- * in the PITest {@code targetClasses} or listed in {@link #ACKNOWLEDGED_EXCLUDES} here. A new class that is neither
- * fails the build until someone classifies it.
- *
- * <p>The allowlist is read from {@code build.gradle.kts} rather than duplicated, so the enrollment registry and the
- * classes PIT actually mutates cannot drift: a class listed here but absent from {@code targetClasses} (believed
- * covered yet never mutated) is caught too.
- */
 class PitestAllowlistEnrollmentTest {
     private static final Path SOURCE_ROOT = Paths.get("src/main/java/world/thearchive/wdl");
     private static final Path CORE_SOURCE = SOURCE_ROOT.resolve("core");
@@ -43,23 +30,17 @@ class PitestAllowlistEnrollmentTest {
     private static final String CORE_PACKAGE = "world.thearchive.wdl.core";
     private static final String ADAPTER_PACKAGE = "world.thearchive.wdl.adapter";
 
-    // The FQN string literals inside the pitest targetClasses list; the targetTests glob ("...wdl.*") and
-    // the class names in prose comments do not match this fully-qualified, capitalized-leaf shape.
+    // The FQN string literals inside the pitest targetClasses list; the class names in prose comments do not match.
     private static final Pattern targetClassFqnPattern = Pattern
             .compile("\"(world\\.thearchive\\.wdl\\.(?:core|adapter)\\.[A-Z][A-Za-z0-9_]*)\"");
 
-    // Every allowlist entry at any package depth. The registry scan above reaches only top-level core/ and
-    // adapter/, so hand-enrolled subpackage entries (core.report, adapter.impl) would otherwise rot silently:
-    // a renamed or moved class leaves a dead glob that PIT matches to zero mutants without erroring, and the
-    // 100 gate stays green over now-unmutated code.
+    // The registry scan above reaches only top-level core/ and adapter/, so hand-enrolled subpackage entries
+    // (core.report, adapter.impl) would otherwise rot silently: a renamed or moved class leaves a dead glob that PIT
+    // matches to zero mutants without erroring, and the 100 gate stays green over now-unmutated code.
     private static final Pattern anyDepthTargetClassFqnPattern = Pattern
             .compile("\"(world\\.thearchive\\.wdl(?:\\.[a-z][a-z0-9]*)*\\.[A-Z][A-Za-z0-9_]*)\"");
 
-    // Classes that match the structural predicate but carry no cross-band fidelity contract, so they are
-    // deliberately not mutated: SPI interfaces (no body to mutate), the IO/threading and packet/render/
-    // tracker plumbing (effect-asserted, not value-asserted), and presentation/config/value types.
     private static final Set<String> ACKNOWLEDGED_EXCLUDES = ImmutableSet.of(
-            // core/ presentation, config, and value types (no fidelity contract):
             "world.thearchive.wdl.core.AtomicFileWrite",
             "world.thearchive.wdl.core.BrandColors",
             "world.thearchive.wdl.core.CaptureCounts",
@@ -97,7 +78,6 @@ class PitestAllowlistEnrollmentTest {
             "world.thearchive.wdl.core.TimingWindow",
             "world.thearchive.wdl.core.ToastCopy",
             "world.thearchive.wdl.core.WorldType",
-            // adapter/ SPI interfaces, IO/threading, packet/render/tracker plumbing, value types:
             "world.thearchive.wdl.adapter.AsyncSaveWriter",
             "world.thearchive.wdl.adapter.CapturedPlayer",
             "world.thearchive.wdl.adapter.ChunkCodec",
@@ -202,12 +182,6 @@ class PitestAllowlistEnrollmentTest {
                         + "both:\n" + bullets(both));
     }
 
-    /**
-     * The structural predicate: every top-level {@code core/} class (which imports no {@code net.minecraft} by the
-     * checkCoreImports invariant) and every top-level {@code adapter/} class that imports {@code net.minecraft} (a
-     * transform operates on vanilla NBT / value types). Subpackages are out of scope by not being scanned, matching the
-     * allowlist's top-level-only reach.
-     */
     private static Set<String> fidelityCandidates() {
         Set<String> candidates = new TreeSet<>();
         for (Path file : topLevelJavaFiles(CORE_SOURCE)) {
@@ -233,7 +207,6 @@ class PitestAllowlistEnrollmentTest {
         return allowlist;
     }
 
-    // Same net.minecraft import scan as the checkCoreImports build fence, so both read the tree identically.
     private static boolean importsMinecraft(Path javaFile) {
         for (String line : readAllLines(javaFile)) {
             String trimmed = line.trim();

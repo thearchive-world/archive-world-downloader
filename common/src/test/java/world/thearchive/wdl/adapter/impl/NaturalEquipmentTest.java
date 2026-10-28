@@ -20,14 +20,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * Pins the 1.12.2 natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven
- * loot pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred,
- * and unknown types are never inferred. There is no {@code EntityType} type-object before 1.13, so a mob is
- * discriminated by its classic {@link net.minecraft.entity.EntityList} registry name, a {@link ResourceLocation}; the
- * drowned (its trident), the wandering trader, and the 1.14 raid-captain ominous-banner carve-out are all absent at
- * this band and are dropped from the table this pins.
- */
 class NaturalEquipmentTest {
     private static final ResourceLocation ZOMBIE = new ResourceLocation("zombie");
     private static final ResourceLocation SKELETON = new ResourceLocation("skeleton");
@@ -84,7 +76,6 @@ class NaturalEquipmentTest {
 
     @Test
     void typeSpecificArmorPools() {
-        // A base-armor spawn wears any armor tier naturally; a no-armor spawn never does.
         assertTrue(NaturalEquipment.isNaturalFor(ZOMBIE, EntityEquipmentSlot.CHEST, of(Items.GOLDEN_CHESTPLATE)));
         assertFalse(NaturalEquipment.isNaturalFor(ZOMBIE_PIGMAN, EntityEquipmentSlot.CHEST,
                 of(Items.LEATHER_CHESTPLATE)));
@@ -92,7 +83,6 @@ class NaturalEquipmentTest {
 
     @Test
     void offhandIsNeverInferred() {
-        // The offhand is outside the inference: a mob can hold an unpersisted item there.
         assertTrue(NaturalEquipment.isNaturalFor(ZOMBIE_PIGMAN, EntityEquipmentSlot.OFFHAND, of(Items.GOLD_INGOT)));
         assertFalse(NaturalEquipment.PICKUP_SLOTS.contains(EntityEquipmentSlot.OFFHAND));
     }
@@ -131,9 +121,6 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.wasLootEquipped(pig), "a type with no spawn-gear profile is never inferred");
     }
 
-    // EntityList.getKey (which NaturalEquipment.wasLootEquipped resolves a mob's type through) matches by exact
-    // runtime class via Forge's EntityRegistry, so a subclassed test double never resolves to a real id; gear is set
-    // through the real EntityLivingBase.setItemStackToSlot instead of a subclass override.
     private static EntityZombie zombie() {
         return new EntityZombie(HeadlessLevel.get());
     }

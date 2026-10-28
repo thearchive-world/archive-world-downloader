@@ -27,26 +27,16 @@ import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for what following the player across a portal does to the session's per-dimension bookkeeping.
- * Chunk positions are dimension-local, so the overworld and the nether name different chunks by the same numbers, and
- * the session therefore keeps a set per dimension and counts the sum of them rather than the one it is currently
- * writing through.
- *
- * <p>A single dimension distinguishes neither property: it makes the sum indistinguishable from the current set's size,
- * and a shared set indistinguishable from a per-dimension one.
- */
 class LiveCaptureSessionDimensionRebindTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // initialize the vanilla static constants the value types touch
+        TestRegistries.bootstrap();
     }
 
     /**
-     * A session with no bound level, which the rebind under test does not need. Entity and container capture are off so
-     * the constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
-     * would clear; the toggles are asserted rather than assumed, since an unrecognized config key falls back to the
-     * default, which is on for both.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots, which only the finish path clears; the toggles are asserted rather than assumed, since an
+     * unrecognized config key falls back to the default, which is on for both.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -98,13 +88,12 @@ class LiveCaptureSessionDimensionRebindTest {
 
         assertEquals(DimensionType.NETHER, field(session, "targetDimension"),
                 "the layout follows the entered dimension's type, so the save writes DIM-1");
-        // DimensionType.getName() is the display name at this band, not the lowercase id the 1.12 rename brought
-        // in. It is an internal key, used the same way on both sides of the rebind, so only its spelling moves.
+        // DimensionType.getName() is the capitalized name at this band, not the lowercase id the 1.12 rename brought
+        // in.
         assertEquals("Nether", field(session, "liveDimensionId"),
                 "while the packet-side stores stay keyed by the name entities are announced under");
     }
 
-    /** Mark {@code positions} captured in the dimension the session is currently bound to. */
     private static void capture(LiveCaptureSession session, ChunkPos... positions) throws Exception {
         LongOpenHashSet captured = capturedPositions(session);
         for (ChunkPos pos : positions) {
@@ -112,10 +101,6 @@ class LiveCaptureSessionDimensionRebindTest {
         }
     }
 
-    /**
-     * The captured-position set of the currently bound dimension. Read reflectively because the only production path
-     * that fills one runs against a live chunk source.
-     */
     private static LongOpenHashSet capturedPositions(LiveCaptureSession session) throws Exception {
         return (LongOpenHashSet) field(session, "allCaptured");
     }

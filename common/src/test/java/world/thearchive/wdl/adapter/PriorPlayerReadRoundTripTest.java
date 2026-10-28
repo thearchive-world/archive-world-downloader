@@ -31,13 +31,6 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The resume-read guard, the read mirror of {@link LevelDatPlayerRoundTripTest}: after a player download, the plug's
- * own {@link LevelDataWriter#readPriorPlayer} recovers the captured player from wherever this band wrote it, so a
- * resume that never reopens the ender chest carries the prior contents forward instead of clobbering them with an empty
- * chest. Band-agnostic: it asserts only the recovered tag, not its on-disk location, so it holds on every band while
- * the plug owns where the read lands.
- */
 class PriorPlayerReadRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 

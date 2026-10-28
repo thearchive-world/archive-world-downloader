@@ -15,20 +15,10 @@ import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Collects what one logger said, for a test that asserts on a diagnostic rather than on a return value: the level it
- * was said at, the rendered line, and whether a stack rode along. The accessors return those three rather than the
- * log4j event, so a test body asserts without naming a logging type.
- *
- * <p>Attaching mutates the process-wide log4j configuration, so a capture must be closed: a leaked one keeps swallowing
+ * Attaching mutates the process-wide log4j configuration, so a capture must be closed: a leaked one keeps swallowing
  * that logger's output for every test that runs after it in the same JVM. The events arrive on whichever thread logged
  * them, so the collection is thread-safe; a caller reading events produced on another thread still has to join it
  * first.
- *
- * <p>The attach goes through the logger rather than the configuration on this band. Minecraft carries log4j 2.0-beta9
- * here, where {@code Configuration} has no {@code addLogger} or {@code removeLogger} and appenders are added to a
- * {@code Logger} directly, so the additive flag is what stops the captured output also reaching the appenders it would
- * inherit. The three values are also copied out of each event as it arrives rather than held as an immutable copy of
- * the event, since {@code LogEvent.toImmutable} arrives later than this release.
  */
 public final class LogCapture implements AutoCloseable {
     private final Logger logger;
@@ -49,9 +39,7 @@ public final class LogCapture implements AutoCloseable {
      * would otherwise inherit from its ancestors.
      *
      * <p>Throws if that exact name already carries an appender of its own, by a real configuration or by a capture
-     * nobody closed, since a second attach would otherwise collect a mixture and on close restore the wrong flags. The
-     * test is against the configuration named for this logger, not against the logger's effective appenders, which are
-     * the root's until something configures the name and so are never empty.
+     * nobody closed, since a second attach would otherwise on close restore the wrong flags.
      */
     public static LogCapture attach(String loggerName) {
         LoggerContext context = (LoggerContext) LogManager.getContext(false);
@@ -64,15 +52,15 @@ public final class LogCapture implements AutoCloseable {
         CollectingAppender appender = new CollectingAppender(loggerName);
         boolean priorAdditive = logger.isAdditive();
         Level priorLevel = logger.getLevel();
-        // Adding an appender to a logger splits a configuration off for its name here, copied from the ancestor it
-        // was inheriting, which is what makes the additive flag below the logger's own rather than the ancestor's.
+        // Adding an appender to a logger splits a configuration off for its name here, copied from the ancestor it was
+        // inheriting.
         logger.addAppender(appender);
         logger.setAdditive(false);
         logger.setLevel(Level.ALL);
         return new LogCapture(logger, priorAdditive, priorLevel, appender);
     }
 
-    /** How many events the logger has emitted since the attach. */
+    /** How many events the logger has emitted since the attach, up to the close. */
     public int count() {
         return appender.events.size();
     }
@@ -82,7 +70,7 @@ public final class LogCapture implements AutoCloseable {
         return event(index).level;
     }
 
-    /** Event {@code index}'s message with its placeholders filled in, the line a reader of the log sees. */
+    /** Event {@code index}'s message with its placeholders filled in. */
     public String rendered(int index) {
         return event(index).rendered;
     }
@@ -92,11 +80,6 @@ public final class LogCapture implements AutoCloseable {
         return event(index).thrown;
     }
 
-    /**
-     * Fails naming the shortfall rather than letting an index walk off the end: a regression that stops a line being
-     * logged at all reaches these accessors before it reaches any assertion, and a bare bounds message would say
-     * nothing about what the test was protecting.
-     */
     private Said event(int index) {
         if (index >= appender.events.size()) {
             throw new AssertionError(logger.getName() + " emitted only " + appender.events.size()
@@ -105,10 +88,6 @@ public final class LogCapture implements AutoCloseable {
         return appender.events.get(index);
     }
 
-    /**
-     * Detach and restore. The split-off configuration itself stays, this log4j release having no way to remove one, but
-     * it is left carrying no appender and the flags it was inheriting, so it routes exactly as it did before.
-     */
     @Override
     public void close() {
         logger.removeAppender(appender);
@@ -119,7 +98,6 @@ public final class LogCapture implements AutoCloseable {
         appender.stop();
     }
 
-    /** One captured line, read off the event while it is still the live one. */
     private static final class Said {
         private final String level;
         private final String rendered;

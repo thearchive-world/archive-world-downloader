@@ -18,11 +18,9 @@ import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
- * Collects one java.util.logging logger's WARNING and SEVERE records for the duration of each test and keeps them off
- * the console. Registered as an extension field, it attaches before each test with the parent handlers off and detaches
- * after it. A test claims each record it provokes through {@link #drain(String)} or {@link #drainAll(String)}; a record
- * still unclaimed when the test passes fails it. Records below WARNING are dropped while it is attached. The collection
- * is unsynchronized: the subject logs on the test's own thread.
+ * A test claims each record it provokes through {@link #drain(String)} or {@link #drainAll(String)}; a record still
+ * unclaimed when the test passes fails it. Records below WARNING are dropped while it is attached. The collection is
+ * unsynchronized: the subject logs on the test's own thread.
  */
 public final class JulCapture implements BeforeEachCallback, AfterEachCallback {
     private final Logger logger;

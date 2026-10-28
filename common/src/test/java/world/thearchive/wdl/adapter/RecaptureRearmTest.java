@@ -12,11 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 
-/**
- * What {@link LiveCaptureSession#rearmUnsaved} leaves behind, read back through {@code needsSaving(false)}: the
- * should-save query the change-driven dirty poll has to stand in for the unsaved reader this band's {@link Chunk} does
- * not expose.
- */
 class RecaptureRearmTest {
     /** Vanilla's entity arm fires once the total world time reaches the chunk's last save time plus this. */
     private static final long ENTITY_TIMER_TICKS = 600L;
@@ -29,7 +24,7 @@ class RecaptureRearmTest {
     private Chunk entityBearingChunk() {
         level.getWorldInfo().setWorldTotalTime(WORLD_AGE_TICKS);
         Chunk chunk = new Chunk(level, 0, 0);
-        // Having ever held an entity is what arms the entity timer; Chunk.addEntity sets this same flag.
+        // Having ever held an entity is what arms the entity timer.
         chunk.setHasEntities(true);
         return chunk;
     }

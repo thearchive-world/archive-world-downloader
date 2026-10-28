@@ -17,11 +17,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * The idcounts byte-check gate: at this band {@code data/idcounts.dat} is the exact shape vanilla's {@code MapStorage}
- * writes, a root {@code {map: short}} written UNCOMPRESSED with no {@code data} wrapper and no {@code DataVersion}. A
- * regression to the parent band's gzip {@code {data:{map:int}, DataVersion}} envelope fails the gzip-magic arm (a) and
- * the root-shape arm (b), which is the archived {@code map_0.dat} overwrite this gate exists to catch: an allocator
- * reading a floor of 0 off the wrong file re-issues captured map ids.
+ * At this band {@code data/idcounts.dat} is the exact shape vanilla's {@code MapStorage} writes, a root
+ * {@code {map: short}} written UNCOMPRESSED with no {@code data} wrapper and no {@code DataVersion}. A regression to a
+ * gzip {@code {data:{map:int}, DataVersion}} envelope overwrites captured maps: an allocator reading a floor of 0 off
+ * the wrong file re-issues captured map ids.
  */
 class MapIdCountsShapeTest {
     @Test
@@ -31,12 +30,11 @@ class MapIdCountsShapeTest {
         Path idcountsDat = dataDirectory.resolve("idcounts.dat");
 
         byte[] raw = Files.readAllBytes(idcountsDat);
-        // (a) uncompressed: not a gzip stream (gzip magic is 0x1f 0x8b)
+        // gzip magic is 0x1f 0x8b
         assertFalse(raw.length >= 2 && (raw[0] & 0xff) == 0x1f && (raw[1] & 0xff) == 0x8b,
                 "idcounts.dat must be uncompressed, not gzip");
         NBTTagCompound root = CompressedStreamTools.read(
                 new DataInputStream(new ByteArrayInputStream(raw)));
-        // (b) root {map: short}, no data wrapper, no DataVersion
         assertEquals(2 /* TAG_Short */, root.getTagId("map"), "map must be a short at the root");
         assertFalse(root.hasKey("data"), "idcounts has no data wrapper");
         assertFalse(root.hasKey("DataVersion"), "idcounts has no DataVersion");

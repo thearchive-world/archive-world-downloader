@@ -32,8 +32,6 @@ class SavedChunkIndexTest {
 
     @Test
     void dimensionsStayPartitionedByTheLiveKey() {
-        // The overworld and nether share the position space; keying by the live id keeps them separate. A
-        // Multiverse-style custom id is just another String key.
         SavedChunkIndex index = new SavedChunkIndex();
         index.add("minecraft:overworld", 5L);
         index.add("minecraft:worlds/2b2t/2b2t_1", 5L);
@@ -44,7 +42,6 @@ class SavedChunkIndexTest {
 
     @Test
     void addAllSeedsUnderTheLiveKeyAndUnionsWithLiveAdds() {
-        // The resume seed hands a batch of prior on-disk positions; a later live add unions in, deduped.
         SavedChunkIndex index = new SavedChunkIndex();
         index.addAll("minecraft:overworld", new long[] { 5L, 9L, 5L });
         index.add("minecraft:overworld", 12L);
@@ -53,7 +50,6 @@ class SavedChunkIndexTest {
 
     @Test
     void reAddingTheSamePositionIsIdempotent() {
-        // A revisit re-buffers a chunk already in the overlay, so re-adding its position must not double-count it.
         SavedChunkIndex index = new SavedChunkIndex();
         index.add("minecraft:overworld", 5L);
         index.add("minecraft:overworld", 5L);
@@ -72,7 +68,7 @@ class SavedChunkIndexTest {
         SavedChunkIndex index = new SavedChunkIndex();
         index.add("minecraft:overworld", 5L);
         long[] taken = index.snapshot("minecraft:overworld");
-        index.add("minecraft:overworld", 9L); // must not mutate the already-taken snapshot
+        index.add("minecraft:overworld", 9L);
         assertArrayEquals(new long[] { 5L }, taken);
     }
 

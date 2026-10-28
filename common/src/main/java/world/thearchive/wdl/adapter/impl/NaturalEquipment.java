@@ -19,28 +19,15 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
 /**
- * The 1.12.2 natural-spawn equipment table, derived from the 1.13.2 table this band was forked from and reduced to the
- * entity types 1.12.2 registers (the drowned, its trident, and the 1.14 raid ominous banner are dropped), and the pure
- * "was this equipped by a loot pickup" inference.
- *
- * <p>There is no {@code EntityType} type-object before 1.13, so a mob is discriminated by its classic
- * {@code EntityList} registry name ({@link EntityList#getKey(net.minecraft.entity.Entity)}) rather than
- * {@code mob.getType()}; the profile table is keyed by that {@link ResourceLocation}.
- *
- * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item
- * ({@code EntityLiving.setItemStackToSlot} plus the drop-chance flag); the client never receives that flag. An equipped
- * item that no natural spawn of the mob's type could carry in that slot therefore proves the pickup ran, hence proves
- * the mob was persistent. The test is scoped to the mainhand and armor slots, the only slots the generic pickup path
- * fills; the offhand is excluded because a mob can hold an unpersisted item there.
+ * The inference is scoped to the mainhand and armor slots; the offhand is excluded because a mob can hold an
+ * unpersisted item there.
  */
 final class NaturalEquipment {
     private NaturalEquipment() {}
 
-    /** The slots the generic pickup path equips (and thus can set persistence for); the offhand is excluded. */
     static final List<EntityEquipmentSlot> PICKUP_SLOTS = ImmutableList.of(EntityEquipmentSlot.MAINHAND,
             EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET);
 
-    /** Which armor family a type may naturally wear. */
     private enum ArmorKind {
         BASE, NONE
     }
@@ -64,9 +51,7 @@ final class NaturalEquipment {
     }
 
     /**
-     * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton). Exempting these for
-     * every type stays free of false positives: no despawn-capable mob acquires them in the head slot through a
-     * persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted invisible-ambiguous case.
+     * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton).
      */
     private static final Set<Item> NATURAL_HEAD_EXTRAS = ImmutableSet.of(
             Item.getItemFromBlock(Blocks.PUMPKIN), Item.getItemFromBlock(Blocks.LIT_PUMPKIN));
@@ -109,7 +94,7 @@ final class NaturalEquipment {
             return true; // an unknown type is never inferred against
         }
         if (slot == EntityEquipmentSlot.OFFHAND) {
-            return true; // the offhand is outside the inference: a bartering gold ingot sits there unpersisted
+            return true;
         }
         if (slot == EntityEquipmentSlot.MAINHAND) {
             return profile.mainhand().contains(item.getItem());

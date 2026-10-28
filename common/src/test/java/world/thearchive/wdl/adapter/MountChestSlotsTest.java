@@ -39,11 +39,6 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The reload gate on a captured mount chest. Every chest slot is filled with a stack sized to that slot's own absolute
- * index and read back through vanilla's own entity reader, because a stack count assertion passes on shifted contents,
- * which is how a two-slot shift shipped past every gate the suite already had.
- */
 class MountChestSlotsTest {
     // Vanilla's replaceItemInInventory addressing for a mount: 499 puts the chest on.
     private static final int CHEST_ITEM_SLOT = 499;
@@ -95,7 +90,6 @@ class MountChestSlotsTest {
                 new HeadlessPlatformBridge(Paths.get(".")), null).captureChestSlots(menu, player);
         assertNotNull(holder, "fixture: a chested mount menu must yield a holder");
 
-        // What the flush does: the mount's own saved tag, with only "Items" replaced by the captured holder.
         NBTTagCompound saved = mount.writeToNBT(new NBTTagCompound());
         saved.setTag("Items", holder.getTagList("Items", 10));
         reloaded.readEntityFromNBT(saved);
@@ -122,14 +116,13 @@ class MountChestSlotsTest {
         return mount;
     }
 
-    /** The strength has to be set before the chest goes on: the inventory is sized once, at that moment. */
+    /** The strength has to be set before the chest goes on: the inventory is sized at that moment. */
     private static EntityLlama llamaOfStrength(int strength) {
         EntityLlama llama = new EntityLlama(HeadlessLevel.get());
         llama.getDataManager().set(strengthId(), strength);
         return llama;
     }
 
-    /** Reached by reflection because vanilla's own strength setter is private. */
     private static DataParameter<Integer> strengthId() {
         try {
             Field field = EntityLlama.class.getDeclaredField("DATA_STRENGTH_ID");
@@ -142,7 +135,6 @@ class MountChestSlotsTest {
         }
     }
 
-    /** A headless {@code EntityPlayerSP}, guarded against the two abstract members that reach the client singleton. */
     private static EntityPlayerSP headlessPlayer() {
         NetHandlerPlayClient connection = new NetHandlerPlayClient(null, null, null,
                 new GameProfile(UUID.randomUUID(), "wdl-test"));

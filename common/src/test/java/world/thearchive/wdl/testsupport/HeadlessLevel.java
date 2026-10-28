@@ -13,11 +13,6 @@ import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.storage.WorldInfo;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A do-nothing overworld {@link World} for headless entity fixtures. The {@code EntityLiving} constructor binds a
- * world, so a mob cannot be built against a null one; this supplies the overworld provider and a fresh profiler through
- * the 1.12.2 {@code World} constructor, with a null save handler and inert stubs for its two abstract members.
- */
 public final class HeadlessLevel extends World {
     private HeadlessLevel() {
         super(null,

@@ -18,41 +18,25 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
-/**
- * 1.11.2 chunk codec: replicates the client-safe slice of vanilla {@code AnvilChunkLoader}'s chunk write to NBT.
- * Vanilla's write reads from a {@code World} a multiplayer client never fully has, so {@link #encode} rebuilds the tag
- * field by field from the captured snapshot. Below the Flattening (this band's own cut) a section stores block state as
- * a numeric id plus a 4-bit metadata nibble rather than a palette, light is section-resident (each
- * {@link ExtendedBlockStorage} carries its own block and sky {@link NibbleArray}), and the root tag stamps this band's
- * own {@code DataVersion}, not the post-Flattening 1631; there being no light engine yet, capture reads light straight
- * off the sections.
- *
- * <p>Two steps (see {@link ChunkCodec}): {@link #capture(Chunk)} captures a live client chunk into a
- * {@link ChunkSnapshotSource}, and {@link #encode(ChunkSnapshotSource, boolean)} encodes that snapshot to NBT (pure, so
- * the headless round-trip guards it).
- */
 public final class ChunkCodecImpl implements ChunkCodec {
     // The 1.11.2 chunk NBT version, the Anvil DataVersion AnvilChunkLoader.saveChunk stamps at the root. It is a
     // per-band value and the parent band's 1343 is the live hazard: a chunk stamped 1343 opens without complaint in a
-    // 1.11.2 client, because a future version reads as already-upgraded, and only breaks later, on an upgrade to
-    // 1.12.2 or above, where the fixer that gives every bed its block entity is skipped and the beds go plain.
+    // 1.11.2 client, because a future version reads as already-upgraded, and only breaks later, on an upgrade to 1.12.2
+    // or above, where the fixer that gives every bed its block entity is skipped.
     private static final int CHUNK_DATA_VERSION = 922;
 
     private static final int BLOCKS_BYTES = 4096;
     private static final int SECTION_LAYER_BYTES = 2048;
 
-    // The 1.11.2 block-section column is 0..15. A client only ever holds sections in that range, so a section index
-    // outside it cannot occur; the encode bound is a defensive guard on the pure surface.
     private static final int MIN_BLOCK_SECTION = 0;
     private static final int MAX_BLOCK_SECTION = 15;
 
     /**
-     * Snapshot a live client chunk on the main thread (block-state section copies, per-chunk biomes, the heightmap,
-     * live block-entity NBT), everything detached so only immutable data crosses to the async IO worker.
+     * Snapshot a live client chunk on the main thread (block-state section copies, per-chunk biomes, the heightmap),
+     * detached so none of them crosses live to the async IO worker.
      *
-     * <p>Light is read off each non-empty section's own layers, the way vanilla's save reads them: the block layer is
-     * always present, and the sky layer only in a dimension that has sky light. A copy is taken so nothing live crosses
-     * to the writer thread.
+     * <p>Light is read off each section's own layers: the block layer is always present, and the sky layer only in a
+     * dimension that has sky light. A copy is taken so nothing live crosses to the writer thread.
      */
     @Override
     public ChunkSnapshotSource capture(Chunk chunk) {
@@ -64,7 +48,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         int minSectionY = 0;
         List<ChunkSnapshotSource.SectionData> sectionData = new ArrayList<>(sections.length);
         for (int sectionY = 0; sectionY < sections.length; sectionY++) {
-            // A null slot is an all-air, unsaved section; vanilla saves only the non-null ones.
+            // A null slot is an all-air, unsaved section.
             ExtendedBlockStorage live = sections[sectionY];
             if (live == null) {
                 continue;
@@ -117,9 +101,9 @@ public final class ChunkCodecImpl implements ChunkCodec {
             if (add != null) {
                 sectionTag.setByteArray("Add", add.getData());
             }
-            // Every non-empty section at this band carries both light arrays: the loader reads them straight into a
-            // NibbleArray, which throws unless the byte array is exactly 2048 long, so an omitted or empty layer would
-            // crash the chunk on load. Sky light is zero-filled in a dimension without sky light, matching vanilla.
+            // Every non-empty section at this band carries both light arrays: the loader reads the block layer, and the
+            // sky layer in a dimension with sky light, straight into a NibbleArray, which throws unless the byte array
+            // is exactly 2048 long, so an omitted or empty layer would crash the chunk on load.
             sectionTag.setByteArray("BlockLight", layerBytes(section.blockLight()));
             sectionTag.setByteArray("SkyLight", layerBytes(section.skyLight()));
             sectionsTag.appendTag(sectionTag);
@@ -132,7 +116,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
             blockEntitiesTag.appendTag(blockEntity);
         }
         levelTag.setTag("TileEntities", blockEntitiesTag);
-        // Client chunks carry no scheduled ticks (those are server state), so the tick list saves empty.
         levelTag.setTag("TileTicks", new NBTTagList());
 
         NBTTagCompound tag = new NBTTagCompound();
@@ -141,12 +124,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return tag;
     }
 
-    /**
-     * A detached copy of a live section. This band's {@link ExtendedBlockStorage} has no copy(), so the copy
-     * reconstructs a fresh section (its constructor takes the section's bottom block y and whether the dimension has
-     * sky light) and replays the block states into it. Biomes live per-chunk here, not on the section, and light is
-     * carried separately, so only the block states are replayed.
-     */
     private static ExtendedBlockStorage copySection(int sectionY, boolean hasSkyLight, ExtendedBlockStorage section) {
         ExtendedBlockStorage copy = new ExtendedBlockStorage(sectionY << 4, hasSkyLight);
         for (int y = 0; y < 16; y++) {
@@ -159,12 +136,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return copy;
     }
 
-    /**
-     * The per-chunk biome ids for the 1.12.2 column: {@code chunk.getBiomeArray()} widened to {@code int}, matching
-     * vanilla {@code AnvilChunkLoader}, which stores the same {@code byte[256]} verbatim under the {@code "Biomes"} key
-     * a 1.12.2 client reads back. Widened (rather than narrowed) here so the shared {@link ChunkSnapshotSource} keeps
-     * one {@code int[]} biome shape across bands; {@link #encode} narrows it back down for the on-disk key.
-     */
     private static int[] columnBiomes(Chunk chunk) {
         byte[] biomes = chunk.getBiomeArray();
         int[] ids = new int[biomes.length];
@@ -174,7 +145,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return ids;
     }
 
-    /** {@code biomes}, narrowed back to the on-disk {@code byte[256]} (pre-Flattening biome ids fit a byte). */
     private static byte[] narrowBiomes(int[] biomes) {
         byte[] narrowed = new byte[biomes.length];
         for (int i = 0; i < biomes.length; i++) {
@@ -183,17 +153,14 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return narrowed;
     }
 
-    /** A detached copy of a stored light layer. */
     private static NibbleArray copyLayer(NibbleArray layer) {
         return new NibbleArray(layer.getData().clone());
     }
 
-    /** The layer's 2048-byte array, or a zero-filled one when the layer is absent (an unlit column). */
     private static byte[] layerBytes(@Nullable NibbleArray layer) {
         return layer != null ? layer.getData() : new byte[SECTION_LAYER_BYTES];
     }
 
-    /** Immutable snapshot of a captured live chunk (only {@link NBTTagCompound}s and copies cross threads). */
     private static final class CapturedChunkSnapshot implements ChunkSnapshotSource {
         private final ChunkPos chunkPos;
         private final int minSectionY;

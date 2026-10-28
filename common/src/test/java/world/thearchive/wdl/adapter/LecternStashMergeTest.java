@@ -28,19 +28,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the save-time lectern-book injection: {@link ContainerMerge#mergeLecternChunkStash} locates a
- * stashed book's lectern block entity inside the captured chunk tag by {@code BlockPos} (matching the
- * {@code Level.TileEntities} list's {@code x/y/z}) and sets its {@code "Book"}/{@code "Page"}, touching no other block
- * entity, then drains the merged entry as the chunk is flushed. This is the part that must never mis-target (writing
- * the wrong block's book corrupts the archive), so it is proven headless with hand-built chunk tags (no live client, no
- * {@code Level}).
- *
- * <p>Disabled at 1.13.2: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be built here,
- * and lectern-book capture is a documented limit at this band. {@link ContainerMerge#mergeLecternChunkStash} keeps
- * coverage through the re-pointed {@code ChunkFlushPlanTest} and {@code OrphanedContainerSweepTest}, which drive it
- * against a stand-in carrier.
- */
 @Disabled("lecterns are a 1.14 block entity, absent at 1.13.2; the save-time lectern-book injection is a documented "
         + "limit with no valid fixture here")
 class LecternStashMergeTest {
@@ -51,7 +38,6 @@ class LecternStashMergeTest {
         TestRegistries.bootstrap();
     }
 
-    /** A written book with a custom {@code title}, below 1.20.5's pre-component {@code title}/{@code pages} NBT. */
     private static ItemStack writtenBook(String title) {
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
         book.setTagCompound(new NBTTagCompound());
@@ -82,11 +68,11 @@ class LecternStashMergeTest {
         BlockPos lecternPos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(
                 blockEntity("minecraft:lectern", 10, 70, 20),
-                blockEntity("minecraft:chest", 11, 70, 20)); // a neighbor BE that must stay untouched
+                blockEntity("minecraft:chest", 11, 70, 20));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(lecternPos, bookHolder("Bound Here", 2));
-        BlockPos elsewhere = new BlockPos(100, 70, 200); // a lectern in a different chunk, not being flushed
+        BlockPos elsewhere = new BlockPos(100, 70, 200);
         stash.put(elsewhere, bookHolder("Other Chunk", 0));
 
         int merged = ContainerMerge.mergeLecternChunkStash(sink, chunkTag, new ChunkPos(lecternPos), stash).merged();
@@ -106,7 +92,7 @@ class LecternStashMergeTest {
     @Test
     void mergeLecternChunkStashDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:lectern", 2, 64, 1)); // a lectern, but elsewhere
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:lectern", 2, 64, 1));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, bookHolder("Lost", 0));

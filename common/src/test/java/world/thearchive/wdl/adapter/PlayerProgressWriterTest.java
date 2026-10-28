@@ -41,7 +41,7 @@ class PlayerProgressWriterTest {
 
     @Test
     void aNullProgressIsNoop(@TempDir Path saveRoot) {
-        PlayerProgressWriter.write(saveRoot, null); // disconnect-flush path
+        PlayerProgressWriter.write(saveRoot, null);
         assertFalse(Files.exists(saveRoot.resolve("stats")));
     }
 
@@ -52,8 +52,8 @@ class PlayerProgressWriterTest {
 
         PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, "{}".getBytes()));
 
-        // Returning normally is the assertion: this runs inside the save finalizer, where a throw would mark an
-        // otherwise-complete download FAILED and skip its backup zip.
+        // This runs inside the save finalizer, where a throw would mark an otherwise-complete download FAILED and skip
+        // its backup zip.
         assertTrue(Files.isRegularFile(saveRoot.resolve("stats")), "the pre-created blocker is still a file");
     }
 

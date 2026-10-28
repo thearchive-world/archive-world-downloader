@@ -43,27 +43,12 @@ import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The furnace-capture regression guard. {@code bindOpenedContainer}'s size read gated on
- * {@code TileEntityLockableLoot}, so a furnace (a {@code TileEntityLockable} that carries no loot table) reported a
- * block-container size of 0 and the size-match bind guard in {@link ContainerAssociation#open} refused it, the same way
- * it refuses a double chest's mismatched half; no furnace, brewing stand, or beacon could bind, and their contents were
- * dropped instead of captured. This drives the real bind method against a real {@link TileEntityFurnace} and its real
- * {@link ContainerFurnace} menu (3 non-player slots), the confident size-matched pair {@link ContainerAssociation#open}
- * is supposed to bind.
- */
 class LiveCaptureSessionLockableContainerBindTest {
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();
     }
 
-    /**
-     * A do-nothing {@code WorldClient} for the headless bind path: the {@code TileEntityLockable} gate reads
-     * {@code level().getTileEntity(target)}, so this reports one fixed block entity at any position and needs no real
-     * chunk storage behind it. Built through the same constructor {@code NetHandlerPlayClient.handleJoinGame} uses in
-     * production, since {@code WorldClient} has no lighter constructor.
-     */
     private static final class HeadlessWorldClient extends WorldClient {
         private final TileEntity fixedBlockEntity;
 
@@ -79,10 +64,8 @@ class LiveCaptureSessionLockableContainerBindTest {
         }
     }
 
-    /** A headless {@code EntityPlayerSP}, guarded against the two abstract members that reach the client singleton. */
     private static final class HeadlessPlayerSp extends EntityPlayerSP {
         HeadlessPlayerSp(WorldClient level, NetHandlerPlayClient connection) {
-            // The recipe book is a 1.12 addition, so this band's constructor takes four arguments, not five.
             super(null, level, connection, new StatisticsManager());
         }
 
@@ -97,7 +80,6 @@ class LiveCaptureSessionLockableContainerBindTest {
         }
     }
 
-    /** A session with no capture toggles on, since the reflective drive below bypasses the tick gate entirely. */
     private static LiveCaptureSession session(Path configDirectory, WorldClient level) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");
@@ -118,7 +100,7 @@ class LiveCaptureSessionLockableContainerBindTest {
                 new GameProfile(UUID.randomUUID(), "wdl-test"));
         HeadlessWorldClient level = new HeadlessWorldClient(connection, furnace);
         HeadlessPlayerSp player = new HeadlessPlayerSp(level, connection);
-        ContainerFurnace menu = new ContainerFurnace(player.inventory, furnace); // vanilla: 3 furnace slots + 36 player
+        ContainerFurnace menu = new ContainerFurnace(player.inventory, furnace);
         BlockPos target = new BlockPos(100, 65, 200);
         LiveCaptureSession session = session(temporary, level);
 

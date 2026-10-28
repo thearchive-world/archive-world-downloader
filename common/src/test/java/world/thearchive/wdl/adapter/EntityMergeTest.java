@@ -22,12 +22,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the resume entity read-merge: {@link EntityMerge} carries forward a container vehicle's (or
- * chested animal's) on-disk {@code "Items"} into a freshly re-captured entity-chunk, matched by {@code "UUID"},
- * preferring non-empty, so a parked storage minecart the prior session opened is not wiped by a fly-through that never
- * re-opened it. The UUID-keyed sibling of {@link ChunkMerge}.
- */
 class EntityMergeTest {
     private static final UUID UUID_A = new UUID(0x1111_1111_1111_1111L, 0x2222_2222_2222_2222L);
     private static final UUID UUID_B = new UUID(0x3333_3333_3333_3333L, 0x4444_4444_4444_4444L);
@@ -80,10 +74,6 @@ class EntityMergeTest {
         return tag.hasUniqueId("UUID") && uuid.equals(tag.getUniqueId("UUID"));
     }
 
-    /**
-     * A villager entity node carrying the trade experience vanilla writes unconditionally (so a client-reconstructed
-     * node carries the client zero here), and the offers holder only when {@code offers} is present.
-     */
     private static NBTTagCompound villager(UUID uuid, @Nullable NBTTagCompound offers, int xp) {
         NBTTagCompound tag = EntityFixtures.entity("minecraft:villager", uuid);
         tag.setInteger("Xp", xp);
@@ -93,9 +83,7 @@ class EntityMergeTest {
         return tag;
     }
 
-    /** The Recipes offers holder vanilla's own trade-list NBT write produces, one offer selling the item. */
     private static NBTTagCompound offersWith(String sellId) {
-        // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
         MerchantRecipeList offers = new MerchantRecipeList();
         offers.add(new MerchantRecipe(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId)));
         return offers.getRecipiesAsTags();
@@ -117,7 +105,7 @@ class EntityMergeTest {
     @Test
     void mergeCarriesOffersForwardWhenFreshVillagerHasNone() {
         NBTTagCompound disk = entitiesChunk(villager(UUID_A, offersWith("minecraft:emerald"), 27));
-        NBTTagCompound fresh = entitiesChunk(villager(UUID_A, null, 0)); // reconstructed: no Offers, Xp:0
+        NBTTagCompound fresh = entitiesChunk(villager(UUID_A, null, 0)); // reconstructed: no Offers
 
         int carried = EntityMerge.merge(disk, fresh);
 
@@ -207,11 +195,8 @@ class EntityMergeTest {
 
     @Test
     void aPartialReflushKeepsThePriorEntities() {
-        // A chunk re-flushed with a partial entity set (the rest re-streamed late, or on a revisit)
-        // must not overwrite the entities a prior flush already wrote. Union by UUID so both survive; the bug
-        // was that only "Items" carried forward, so the fresh (partial) write replaced the on-disk full set.
-        NBTTagCompound onDisk = entities(vehicle(UUID_A, "minecraft:diamond")); // a prior flush saved A
-        NBTTagCompound fresh = entities(vehicle(UUID_B)); // later partial flush of same chunk; A not in this batch
+        NBTTagCompound onDisk = entities(vehicle(UUID_A, "minecraft:diamond"));
+        NBTTagCompound fresh = entities(vehicle(UUID_B));
 
         EntityMerge.merge(onDisk, fresh);
 
@@ -223,11 +208,11 @@ class EntityMergeTest {
 
     @Test
     void anEntityAbsentFromTheFreshCaptureIsCarriedForward() {
-        // Union always: a re-flush (or a resume) carries forward an entity absent from the fresh capture
-        // rather than dropping it. Accepted ghosting (over-capture > under-capture), UUID-deduped so never
-        // duplicated. The within-session-only alternative (resume strictly current) is rejected.
+        // Union always: a re-flush (or a resume) carries forward an entity absent from the fresh capture rather than
+        // dropping it. Accepted ghosting (over-capture > under-capture). The within-session-only alternative (resume
+        // strictly current) is rejected.
         NBTTagCompound onDisk = entities(vehicle(UUID_A, "minecraft:diamond"));
-        NBTTagCompound fresh = entities(); // A not in the fresh capture
+        NBTTagCompound fresh = entities();
 
         assertEquals(1, EntityMerge.merge(onDisk, fresh), "A is carried forward");
         assertEquals(1, ((NBTTagList) fresh.getTag("Entities")).tagCount(), "carried, not dropped");
@@ -248,10 +233,8 @@ class EntityMergeTest {
 
     @Test
     void aNullUuidOnDiskEntityIsCarriedForwardNotDropped() {
-        // An on-disk entity whose "UUID" is absent or malformed cannot be UUID-deduped, but the union's
-        // stated contract is to carry forward every on-disk entity the fresh capture lacks (over-capture beats
-        // under-capture). We always write a valid UUID, so the trigger is corruption or a foreign-written save;
-        // dropping it would silently lose the user's existing world data. Carry it forward, the same as a keyed one.
+        // An on-disk entity whose "UUID" is absent or malformed cannot be UUID-deduped, but dropping it would silently
+        // lose the user's existing world data.
         NBTTagCompound noUuid = EntityFixtures.entityWithoutUuid("minecraft:chest_minecart");
         NBTTagCompound onDisk = entities(noUuid);
         NBTTagCompound fresh = entities(vehicle(UUID_A));
@@ -262,11 +245,10 @@ class EntityMergeTest {
 
     @Test
     void anAbsentEntitiesListOnEitherSideChangesNothing() {
-        // The early-return guard covers an ABSENT "Entities" key, not just a present-but-empty list. A chunk
-        // with no list fresh (defensive) or none on disk (a first write) has nothing to union; merge is a no-op
-        // and never throws. Production always hands a fresh tag carrying an "Entities" list.
+        // The early-return guard covers an ABSENT "Entities" key, not just a present-but-empty list. A chunk with no
+        // list fresh (defensive) or none on disk has nothing to union; merge is a no-op and never throws.
         NBTTagCompound onDiskWithEntities = entities(vehicle(UUID_A, "minecraft:diamond"));
-        NBTTagCompound freshNoList = new NBTTagCompound(); // no "Entities" key at all
+        NBTTagCompound freshNoList = new NBTTagCompound();
         assertEquals(0, EntityMerge.merge(onDiskWithEntities, freshNoList), "fresh has no list: nothing to merge into");
 
         NBTTagCompound onDiskNoList = new NBTTagCompound();

@@ -34,26 +34,12 @@ import world.thearchive.wdl.core.OpenClickIntent;
 import world.thearchive.wdl.core.SpectatorCrosshairFallback;
 import world.thearchive.wdl.platform.PlatformBridge;
 
-/**
- * The MC-typed recognize-and-lift for an open container menu: given the open menu, the local player, and the clicked
- * target, decide what the container is (single chest, ender chest, double chest, chested animal, or container vehicle)
- * and lift its synthetic client slots into an {@code "Items"} holder. Pure decision and serialization, carrying no
- * capture state: {@link LiveCaptureSession} owns the per-tick orchestration, the {@link ContainerAssociation} bind, and
- * the stash and outline state, and calls in here for recognition and the slot lift.
- *
- * <p>Package-private, the analog of {@link MenuChangeTracker}; the {@code *Capture} siblings
- * ({@link EntityPacketCapture}, {@link InteractionCapture}) are public only because per-loader code reaches them across
- * packages, which does not apply here. Main-thread only, like the rest of capture.
- */
 final class ContainerCapture {
     private static final Logger LOGGER = LogManager.getLogger(ContainerCapture.class);
 
-    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
-    // body-armor. Vanilla names the same 2 as the mount inventory start index.
+    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the body-armor.
     private static final int SLOT_INVENTORY_START = 2;
 
-    // A lectern block entity does not exist at this band (lecterns are a 1.14 block), so the lectern capture path is
-    // inert here; the constant is kept for the shared, band-stable bind wiring the deep-band guard-out leaves in place.
     static final int LECTERN_CONTAINER_SIZE = 1;
 
     private final VersionAdapter adapter;
@@ -69,20 +55,15 @@ final class ContainerCapture {
     }
 
     /**
-     * The target a freshly-opened container menu belongs to: the block or entity the open resolved to if a fresh click
-     * seeded this open, an empty target carrying the vehicle intent for a latched ridden-vehicle open whose vehicle is
-     * STILL the one ridden (the vehicle bind claims it on that intent), else empty. The clicked target is the fix for
-     * open-time drift (the crosshair keeps moving until the menu freezes the camera), and an open no click accounts for
-     * is left unattributed: where the player LOOKS is not evidence of what opened, so binding a menu to the crosshair
-     * writes its contents into whatever block or entity the view happens to rest on once the slot counts coincide.
+     * The clicked target is the fix for open-time drift (the crosshair keeps moving until the menu freezes the camera),
+     * and an open no click accounts for is left unattributed: where the player LOOKS is not evidence of what opened, so
+     * binding a menu to the crosshair writes its contents into whatever block or entity the view happens to rest on
+     * once the slot counts coincide.
      *
-     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there, not a vestige of the pre-click behavior: a
-     * loader use hook that declines to fire for a spectator leaves the click unobserved, so every container a spectator
-     * opens on that axis would bind nothing without this. The open-time drift the clicked target removes elsewhere is
-     * accepted here, because the alternative on a blind axis is capturing nothing at all.
-     *
-     * <p>Which leg may run, and when, is {@link SpectatorCrosshairFallback}, decided MC-free so both loader
-     * configurations are pinned headlessly; this extracts the live booleans it reads.
+     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there: a loader use hook that declines to fire for a
+     * spectator leaves the click unobserved, so every container a spectator opens on that axis would bind nothing
+     * without this. The open-time drift the clicked target removes elsewhere is accepted here, because the alternative
+     * on a blind axis is capturing nothing at all.
      */
     OpenTarget resolveOpenTarget(Minecraft minecraft, EntityPlayerSP player) {
         OpenClickTracker tracker = this.openClickTracker;
@@ -98,10 +79,6 @@ final class ContainerCapture {
                 return new OpenTarget(null, tracker.clickedEntity(), false);
             }
             if (resolved == OpenClickIntent.Target.VEHICLE) {
-                // An open-inventory request the client sent while riding a container vehicle: the open is that
-                // vehicle's own menu as far as the latch can tell, so the target stays empty and the vehicle intent
-                // it carries is what the ridden-vehicle bind claims it on. The crosshair is deliberately not
-                // consulted: whatever it rests on did not cause this open.
                 Entity vehicle = player.getRidingEntity();
                 if (vehicle != null && vehicle.getEntityId() == tracker.resolvedVehicleId()) {
                     LOGGER.debug("open target: ridden vehicle (open-inventory request)");
@@ -114,20 +91,16 @@ final class ContainerCapture {
                 return new OpenTarget(null, null, false);
             }
             if (resolved == OpenClickIntent.Target.SUPERSEDED) {
-                // This open belongs to an intent a later one overwrote, so it binds nothing at all.
                 LOGGER.info("open target: superseded (a later intent overwrote the one this open belongs to)");
                 return new OpenTarget(null, null, false);
             }
         }
-        // This band's RayTraceResult is a single unified type; the BLOCK/ENTITY discriminator is the typeOfHit field,
-        // the block pos is getBlockPos, and the entity is entityHit. There is no BlockHitResult / EntityHitResult
-        // split to cast to.
         RayTraceResult hit = minecraft.objectMouseOver;
         RayTraceResult blockHit = hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK ? hit : null;
         RayTraceResult entityHit = hit != null && hit.typeOfHit == RayTraceResult.Type.ENTITY ? hit : null;
         // The provider read is gated on the gamemode here, not left to the rule below: Java evaluates arguments
         // eagerly, so passing it unguarded would run an on-demand getTileEntity for every unattributed open in every
-        // gamemode. The rule still decides; this only withholds an input it cannot use.
+        // gamemode.
         boolean spectator = player.isSpectator();
         boolean blockOpensForSpectator = spectator && blockHit != null
                 && spectatorCouldOpen(player.world, blockHit.getBlockPos());
@@ -146,23 +119,10 @@ final class ContainerCapture {
         return new OpenTarget(null, null, false);
     }
 
-    /**
-     * Whether a SPECTATOR's click on this block could have opened a menu at all. The same predicate the click latch
-     * applies, deliberately shared rather than restated: a block that cannot open a menu for this player must neither
-     * seed a latch nor be read off the crosshair, and two copies of that rule would drift. See
-     * {@link OpenClickTracker#opensMenuFor} for why the spectator answer is narrower.
-     */
     private static boolean spectatorCouldOpen(World level, BlockPos pos) {
         return OpenClickTracker.opensMenuFor(level, pos, true);
     }
 
-    /**
-     * The block or entity a freshly-opened container menu belongs to; at most one is non-null. {@code vehicleIntent} is
-     * true only for an open seeded by an open-inventory request the client sent while riding a container vehicle it
-     * still rides. That is what was latched, not proof that this menu is the one the request asked for; the pairing
-     * rests on the intent chain's one-open-per-action assumption. It is what the ridden-vehicle bind claims on, so an
-     * open with no target and no intent belongs to nobody.
-     */
     static final class OpenTarget {
         private final @Nullable BlockPos block;
         private final @Nullable Entity entity;
@@ -189,17 +149,14 @@ final class ContainerCapture {
         }
     }
 
-    /** Whether the open target is a block whose block entity is an ender chest (the ender discriminator). */
     boolean isEnderChestAt(WorldClient level, @Nullable BlockPos target) {
         return target != null && level.getTileEntity(target) instanceof TileEntityEnderChest;
     }
 
     /**
-     * Whether this is a genuine double-chest open: a six-row (54-slot) {@link ContainerChest} opened over an open
-     * target that is one half of a double chest. The double discriminator. The six-row gate is the cheap "this is a 54
-     * open" signal; it also rejects any sub-54 {@code ContainerChest} seen while the client still renders a double half
-     * during a transient block-state / menu-open sync race so that a 27-slot menu falls through to the single-block
-     * container bind instead.
+     * The six-row gate is the cheap "this is a 54 open" signal; it also rejects any sub-54 {@code ContainerChest} seen
+     * while the client still renders a double half so that a 27-slot menu falls through to the single-block container
+     * bind instead.
      */
     boolean isDoubleChestOpen(WorldClient level, Container menu, @Nullable BlockPos target) {
         // A ContainerChest adds its block container slots first, so slot 0's inventory is the block container and its
@@ -209,18 +166,12 @@ final class ContainerCapture {
                 && isDoubleChestHalfAt(level, target);
     }
 
-    /** Whether the open target is a block that is one half of a double chest (the double discriminator). */
     private boolean isDoubleChestHalfAt(WorldClient level, @Nullable BlockPos target) {
         return target != null && doubleChestPartner(level, target) != null;
     }
 
     /**
-     * The matching adjacent chest that forms a double chest with the one at {@code pos}, or null when {@code pos} is
-     * not a chest or has no matching neighbor. There is no {@code ChestType} left/right block-state property before
-     * 1.13, so a double chest is recognized by the pre-Flattening neighbor probe: both halves are plain
-     * {@link TileEntityChest}s, so the four horizontal neighbors are probed in the order {@code +Z, -Z, +X, -X} and the
-     * first one that is a chest of the same kind (normal vs trapped, {@code getChestType}) is the partner, exactly as
-     * vanilla pairs a large chest. A chest never pairs with a chest of the other kind.
+     * A chest never pairs with a chest of the other kind.
      */
     @Nullable
     static BlockPos doubleChestPartner(World level, BlockPos pos) {
@@ -239,23 +190,15 @@ final class ContainerCapture {
         return null;
     }
 
-    /**
-     * Whether the container-vehicle axis claims this open: either the open target is a container vehicle (right-click a
-     * chest minecart) or the open carries a vehicle intent and the player rides one. The precedence itself is
-     * {@link ContainerAssociation#shouldClaimVehicleOpen}, decided MC-free; this extracts the live booleans.
-     */
     boolean shouldClaimVehicleOpen(EntityPlayerSP player, @Nullable Entity target, boolean vehicleIntentOpen) {
         return ContainerAssociation.shouldClaimVehicleOpen(target instanceof EntityMinecartContainer,
                 player.getRidingEntity() instanceof EntityMinecartContainer, vehicleIntentOpen);
     }
 
     /**
-     * The chested animal {@code menu} is the inventory of, or {@code null} when it is not one. The menu names its own
-     * mount ({@link MountMenuReader}), so this is both the bind target and the dispatch gate: neither depends on the
-     * open target or the ridden vehicle, so a menu opened for one chested animal can never be bound to another the
-     * crosshair happens to rest on. Non-null only for a chested animal, so a mount menu for a chestless mount, and
-     * every other menu, falls through to the axes below it, and the horse menu never reaches the menu-type-blind
-     * vehicle branch.
+     * The menu names its own mount ({@link MountMenuReader}), so this is both the bind target and the dispatch gate:
+     * neither depends on the open target or the ridden vehicle, so a menu opened for one chested animal can never be
+     * bound to another the crosshair happens to rest on.
      */
     @Nullable
     AbstractChestHorse chestedAnimal(Container menu) {
@@ -264,9 +207,6 @@ final class ContainerCapture {
                 : null;
     }
 
-    /**
-     * Count the menu's non-player slots: the block container's slots.
-     */
     static int countBlockSlots(Container menu, EntityPlayerSP player) {
         IInventory playerInventory = player.inventory;
         int count = 0;
@@ -294,11 +234,6 @@ final class ContainerCapture {
         return count;
     }
 
-    /**
-     * Serialize a menu's non-player block slots (each at its container-slot index) into an {@code "Items"} holder via
-     * the per-band {@link ContainerSink}, or {@code null} when the menu exposes no block slots this tick. Shared by the
-     * container and ender-chest stashes (both lift the same synthetic client slots).
-     */
     @Nullable
     NBTTagCompound captureBlockSlots(Container menu, EntityPlayerSP player) {
         IInventory playerInventory = player.inventory;
@@ -310,12 +245,12 @@ final class ContainerCapture {
             }
         }
         if (blockContainer == null) {
-            return null; // bound but no block slots this tick; nothing to capture
+            return null;
         }
         int size = blockContainer.getSizeInventory();
         NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
-        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
-        // slots: a client block container adds its slots consecutively in container-index order.
+        // The container index is the menu order of the non-player slots: a client block container adds its slots
+        // consecutively in container-index order.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {
@@ -331,22 +266,13 @@ final class ContainerCapture {
 
     /**
      * Ride the brewing stand's persisted menu-only state on {@code holder}: vanilla's exact key names and NBT types
-     * (BrewTime short, Fuel byte), so the merged block entity loads unchanged. Pure so the key/type contract is
-     * testable headless; the caller reads the live menu's two data values.
+     * (BrewTime short, Fuel byte), so the merged block entity loads unchanged.
      */
     static void putBrewingState(NBTTagCompound holder, int brewingTicks, int fuel) {
         holder.setShort("BrewTime", (short) brewingTicks);
         holder.setByte("Fuel", (byte) fuel);
     }
 
-    /**
-     * Serialize only the chest slots of an open chested-animal menu (the non-player slots from
-     * {@link #SLOT_INVENTORY_START}) into an {@code "Items"} holder via the per-band {@link ContainerSink}, or
-     * {@code null} when the menu exposes no chest slots this tick (a chestless animal). Distinct from
-     * {@link #captureBlockSlots}: a mount has no chest inventory of its own at this band, so the slots are numbered
-     * into the whole mount inventory from {@link #SLOT_INVENTORY_START} rather than from zero. Kept separate on
-     * purpose.
-     */
     @Nullable
     NBTTagCompound captureChestSlots(Container menu, EntityPlayerSP player) {
         IInventory playerInventory = player.inventory;
@@ -358,7 +284,7 @@ final class ContainerCapture {
             }
         }
         if (chest.isEmpty()) {
-            return null; // bound but no chest slots this tick; nothing to capture
+            return null;
         }
         // Offset into vanilla's own numbering: a mount's chest shares one inventory with the saddle and armor
         // slots, and its read drops any saved entry below SLOT_INVENTORY_START. A zero-based holder therefore loses
@@ -371,21 +297,15 @@ final class ContainerCapture {
     }
 
     /**
-     * Serialize the menu's non-player slots whose container index is in {@code [low, high)} into a 0-based
-     * {@code "Items"} holder (re-based to {@code index - low}) via the per-band {@link ContainerSink}, or {@code null}
-     * when that range is empty this tick. The client's double-chest menu is one {@code InventoryLargeChest(54)} with
-     * contiguous container indices 0..53, so {@code [0, 27)} is the lower-coordinate chest (slots 0-26) and
-     * {@code [27, 54)} the higher-coordinate one, matching vanilla's own large-chest slot order. Kept separate from
-     * {@link #captureChestSlots} on purpose.
+     * {@code [0, 27)} is the lower-coordinate chest and {@code [27, 54)} the higher-coordinate one.
      */
     @Nullable
     NBTTagCompound captureHalfSlots(Container menu, EntityPlayerSP player, int low, int high) {
         IInventory playerInventory = player.inventory;
         NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
         boolean any = false;
-        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
-        // slots. The client double-chest menu is one InventoryLargeChest(54) with contiguous indices 0..53, so menu
-        // order equals the container index.
+        // The container index is the menu order of the non-player slots. The client double-chest menu wraps one
+        // ContainerLocalMenu(54) with contiguous indices 0..53, so menu order equals the container index.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {
