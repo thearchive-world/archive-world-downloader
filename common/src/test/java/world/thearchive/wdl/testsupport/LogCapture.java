@@ -16,11 +16,7 @@ import org.apache.logging.log4j.core.config.Property;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Collects what one logger said, for a test that asserts on a diagnostic rather than on a return value: the level it
- * was said at, the rendered line, and whether a stack rode along. The accessors return those three rather than the
- * log4j event, so a test body asserts without naming a logging type.
- *
- * <p>Attaching mutates the process-wide log4j configuration, so a capture must be closed: a leaked one keeps swallowing
+ * Attaching mutates the process-wide log4j configuration, so a capture must be closed: a leaked one keeps swallowing
  * that logger's output for every test that runs after it in the same JVM. The events arrive on whichever thread logged
  * them, so the collection is thread-safe; a caller reading events produced on another thread still has to join it
  * first.
@@ -58,7 +54,7 @@ public final class LogCapture implements AutoCloseable {
         return new LogCapture(loggerName, appender);
     }
 
-    /** How many events the logger has emitted since the attach. */
+    /** How many events the logger has emitted since the attach, up to the close. */
     public int count() {
         return appender.events.size();
     }
@@ -68,7 +64,7 @@ public final class LogCapture implements AutoCloseable {
         return event(index).getLevel().name();
     }
 
-    /** Event {@code index}'s message with its placeholders filled in, the line a reader of the log sees. */
+    /** Event {@code index}'s message with its placeholders filled in. */
     public String rendered(int index) {
         return event(index).getMessage().getFormattedMessage();
     }
@@ -78,11 +74,6 @@ public final class LogCapture implements AutoCloseable {
         return event(index).getThrown();
     }
 
-    /**
-     * Fails naming the shortfall rather than letting an index walk off the end: a regression that stops a line being
-     * logged at all reaches these accessors before it reaches any assertion, and a bare bounds message would say
-     * nothing about what the test was protecting.
-     */
     private LogEvent event(int index) {
         if (index >= appender.events.size()) {
             throw new AssertionError(loggerName + " emitted only " + appender.events.size()

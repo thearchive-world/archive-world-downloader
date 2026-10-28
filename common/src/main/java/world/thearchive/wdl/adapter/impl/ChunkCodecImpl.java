@@ -35,45 +35,32 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
-/**
- * 1.21.3 chunk codec: replicates the minimal client-safe slice of vanilla
- * {@code SerializableChunkData.copyOf(ServerLevel, ChunkAccess)} to {@code write()}.
- *
- * <p>Two steps (see {@link ChunkCodec}): {@link #capture(LevelChunk, RegistryAccess)} captures a live client chunk into
- * a {@link ChunkSnapshotSource}, and {@link #encode(ChunkSnapshotSource, RegistryAccess, boolean)} encodes that
- * snapshot to NBT (pure, so the headless round-trip guards it).
- */
 public final class ChunkCodecImpl implements ChunkCodec {
-    /** Client chunks have no scheduled ticks (those are server state). */
     private static final ChunkAccess.PackedTicks NO_TICKS = new ChunkAccess.PackedTicks(List.of(), List.of());
 
-    /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
-    /** Vanilla full-height overworld: min block -64, height 384; the range BlendingDataFix marks as old generation. */
+    /**
+     * Vanilla full-height overworld: min block -64, height 384; the range {@code BlendingDataFix} marks as old
+     * generation.
+     */
     private static final int OVERWORLD_MIN_Y = -64;
     private static final int OVERWORLD_HEIGHT = 384;
 
-    // The blending_data MC's BlendingDataFix would inject for the overworld: the section bounds marking this chunk
-    // as old generation so a freshly generated neighbor blends against it instead of forming a boundary wall.
-    // Heights are left empty; MC fills them lazily on the first neighbor-generation call.
+    // The blending_data MC's BlendingDataFix would inject for the overworld: the section bounds marking this chunk as
+    // old generation so a freshly generated neighbor blends against it instead of forming a boundary wall.
     private static final BlendingData.Packed OVERWORLD_BLENDING = new BlendingData.Packed(
             SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y),
             SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y + OVERWORLD_HEIGHT), Optional.empty());
 
     /**
-     * Snapshot a live client chunk on the main thread (block-state/biome section copies, cloned heightmaps,
-     * block-entity NBT), everything detached so only immutable data crosses to the async IO worker. The server-only
-     * structure call is dropped here and reproduced as empty maps in
-     * {@link #encode(ChunkSnapshotSource, RegistryAccess, boolean)}.
+     * Snapshot a live client chunk on the main thread (block-state/biome section copies, cloned heightmaps), detached
+     * so none of them crosses live to the async IO worker.
      *
-     * <p>Light is read from the client light engine the way the server's own save path reads its engine (the
-     * {@code SerializableChunkData.copyOf} slice): the padded section range, keeping only non-empty layers. A chunk
-     * qualifies only when the engine reports its initial server light applied ({@code lightOnInColumn}); otherwise the
-     * snapshot carries no light and reports {@code lightCorrect=false}, and vanilla relights that chunk on load.
-     * Pending light work is drained first, effectively once per tick (later calls find none): a block edit updates the
-     * section palette immediately while its relight waits for the render pass, so an undrained read could freeze
-     * pre-edit light under {@code isLightOn=true}.
+     * <p>A chunk qualifies only when the engine reports its initial server light applied ({@code lightOnInColumn});
+     * otherwise the snapshot carries no light and reports {@code lightCorrect=false}, and vanilla relights that chunk
+     * on load. Pending light work is drained first: a block edit updates the section palette immediately while its
+     * relight waits, so an undrained read could freeze pre-edit light under {@code isLightOn=true}.
      */
     @Override
     public ChunkSnapshotSource capture(LevelChunk chunk, RegistryAccess registries) {
@@ -128,45 +115,37 @@ public final class ChunkCodecImpl implements ChunkCodec {
     public CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending) {
         Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
 
-        // NeoForge marks the vanilla canonical SerializableChunkData constructor deprecated in favor of a
-        // 20-argument attachment-aware overload that does not exist in vanilla. This captures vanilla client-chunk
-        // data only, so the canonical constructor is the correct call; vanilla and Fabric do not deprecate
-        // it, leaving the suppression inert there.
         @SuppressWarnings("deprecation")
         SerializableChunkData data = new SerializableChunkData(
                 biomeRegistry,
                 snapshot.chunkPos(),
                 snapshot.minSectionY(),
-                snapshot.gameTime(),                 // LastUpdate
+                snapshot.gameTime(),
                 snapshot.inhabitedTime(),
                 snapshot.status(),
-                synthesizeBlending ? OVERWORLD_BLENDING : null, // blendingData: synthesized for a blended overworld
-                null,                                 // belowZeroRetrogen: none
-                UpgradeData.EMPTY,                    // upgradeData: none
-                null,                                 // carvingMask: LEVELCHUNK type, none
+                synthesizeBlending ? OVERWORLD_BLENDING : null,
+                null,
+                UpgradeData.EMPTY,
+                null,
                 clientHeightmaps(snapshot),
                 NO_TICKS,
                 NO_POST_PROCESSING,
                 snapshot.lightCorrect(),
                 snapshot.sections(),
-                List.of(),                            // entities: saved to the entities/ region, not here
+                List.of(),
                 snapshot.blockEntities(),
-                emptyStructureData());                // structures: empty starts/references, no server call
+                emptyStructureData());
         return data.write();
     }
 
-    /** A detached copy of a stored layer, or null when the engine holds none (empty layers are omitted). */
     private static @Nullable DataLayer copyNonEmpty(@Nullable DataLayer layer) {
         return layer != null && !layer.isEmpty() ? layer.copy() : null;
     }
 
     /**
-     * Heightmaps to persist: those the client actually received ({@code sendToClient()}) and relevant to the chunk's
-     * status ({@code heightmapsAfter()}). For a FULL chunk this keeps the three CLIENT-usage maps and drops
-     * {@code OCEAN_FLOOR}, which the {@code LevelChunk} ctor pre-creates but the server never transmits (it filters the
-     * chunk packet by {@code sendToClient()}), leaving it present-but-zeroed on the client. Omitting it makes vanilla
-     * {@code read()} re-prime it on load rather than trust bad data. {@code sendToClient()} is exactly vanilla's own
-     * "what the client got" predicate, so it tracks correctly even if the heightmap set changes across versions.
+     * For a FULL chunk this drops {@code OCEAN_FLOOR}, which the {@code LevelChunk} ctor pre-creates but the server
+     * never transmits (it filters the chunk packet by {@code sendToClient()}), leaving it present-but-zeroed on the
+     * client. Omitting it makes vanilla {@code read()} re-prime it on load rather than trust bad data.
      */
     private static Map<Heightmap.Types, long[]> clientHeightmaps(ChunkSnapshotSource snapshot) {
         Set<Heightmap.Types> persistable = snapshot.status().heightmapsAfter();
@@ -179,12 +158,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return kept;
     }
 
-    /**
-     * The structure tag for a client chunk: {@code {starts:{}, References:{}}}, exactly what vanilla
-     * {@code packStructureData} emits for empty start/reference maps (client chunks always carry empty ones). Built
-     * directly so we never call {@code StructurePieceSerializationContext.fromLevel(serverLevel)}, which dereferences
-     * {@code level.getServer()} and NPEs on a client.
-     */
     private static CompoundTag emptyStructureData() {
         CompoundTag structures = new CompoundTag();
         structures.put("starts", new CompoundTag());
@@ -192,7 +165,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return structures;
     }
 
-    /** Immutable snapshot of a captured live chunk (only {@link CompoundTag}s and copies cross threads). */
     private record CapturedChunkSnapshot(
             ChunkPos chunkPos,
             int minSectionY,

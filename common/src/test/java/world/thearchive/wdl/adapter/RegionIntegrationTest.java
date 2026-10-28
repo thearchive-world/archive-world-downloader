@@ -42,15 +42,6 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * Region-pipeline integration: the real {@link SimpleRegionStorage} path under {@link WorldPaths}, covering multi-chunk
- * + region-boundary placement, the &gt;1 MiB external-{@code .mcc} spill, {@code synchronize(true)}+{@code close()}
- * drain, reopen-and-read-back from a fresh storage, and the read-merge recapture path over an on-disk prior.
- *
- * <p>The chiseled bookshelf rides here rather than only in {@link ChunkMerge}'s own headless test because the loss it
- * guards is invisible anywhere else: both writes succeed, no counter moves, and the only evidence that the earlier
- * books are gone is the bytes left in the region file.
- */
 class RegionIntegrationTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
     private final ContainerSink containerSink = new ContainerSinkImpl();
@@ -81,7 +72,6 @@ class RegionIntegrationTest {
         WorldPaths paths = new WorldPathsImpl(save);
         Path region = paths.regionDirectory(Level.OVERWORLD);
 
-        // (0,0)+(31,31) share region 0,0; the others cross boundaries into r.1.0 / r.0.1 / r.-1.-1.
         List<ChunkPos> positions = List.of(
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
@@ -89,7 +79,7 @@ class RegionIntegrationTest {
         try (SimpleRegionStorage out = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
-                tag.putInt("wdlTestId", i); // distinct marker -> proves each chunk lands at its own pos
+                tag.putInt("wdlTestId", i);
                 out.write(positions.get(i), tag).join();
             }
             out.synchronize(true).join();
@@ -97,7 +87,6 @@ class RegionIntegrationTest {
             throw new RuntimeException(e);
         }
 
-        // Reopen with a FRESH storage and read every chunk back at its position.
         try (SimpleRegionStorage in = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag back = in.read(positions.get(i)).join()
@@ -121,8 +110,7 @@ class RegionIntegrationTest {
         Path region = paths.regionDirectory(Level.OVERWORLD);
         ChunkPos pos = new ChunkPos(5, 5);
 
-        // Incompressible payload: RegionFile zlib-compresses chunks, so all-zero bytes would shrink to
-        // nothing and never spill. Fixed-seed random bytes stay ~2 MiB compressed -> external-file branch.
+        // RegionFile zlib-compresses chunks, so all-zero bytes would never spill.
         byte[] pad = new byte[2 * 1024 * 1024];
         new Random(0xC0FFEEL).nextBytes(pad);
         CompoundTag big = new CompoundTag();
@@ -152,25 +140,22 @@ class RegionIntegrationTest {
         int[] mergeCalls = { 0 };
         RegionChunkWriter.ChunkReadMerge merge = (onDisk, fresh) -> {
             mergeCalls[0]++;
-            return 3; // a stand-in carry-forward count; ChunkMerge's own logic is tested headlessly
+            return 3;
         };
 
         try (SimpleRegionStorage out = storage(paths, region)) {
-            // No prior on disk: a plain new write, the merge is never invoked.
             RegionChunkWriter.MergeWriteResult first = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
                     codec.encode(SyntheticChunks.full(registries, true), registries, false), merge);
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, first.outcome());
             assertEquals(0, mergeCalls[0], "no prior, so nothing to merge");
             out.synchronize(true).join();
 
-            // A prior now exists: the read finds it, the merge runs, the merge-back count is surfaced.
             RegionChunkWriter.MergeWriteResult second = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
                     codec.encode(SyntheticChunks.full(registries, true), registries, false), merge);
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_RECAPTURED, second.outcome());
             assertEquals(1, mergeCalls[0], "the on-disk prior was read and merged");
             assertEquals(3, second.mergeBacks());
 
-            // A null tag has nothing to write, which is not a loss and is counted as none.
             assertEquals(RegionChunkWriter.MergeOutcome.NOTHING_TO_WRITE,
                     RegionChunkWriter.writeMerging(out, new ChunkPos(1, 0), null, merge).outcome());
         }
@@ -184,8 +169,7 @@ class RegionIntegrationTest {
         ChunkPos pos = new ChunkPos(0, 0);
 
         try (SimpleRegionStorage out = storage(paths, region)) {
-            // Three books go in, the chunk flushes; later one more book goes in and the chunk flushes again. The
-            // second capture names only the slot it saw, because a bookshelf's contents never reach the client.
+            // The second capture names only the slot it saw, because a bookshelf's contents never reach the client.
             RegionChunkWriter.writeMerging(out, pos, bookshelfChunk(registries, 0, 1, 2), ChunkMerge::merge);
             out.synchronize(true).join();
             RegionChunkWriter.writeMerging(out, pos, bookshelfChunk(registries, 3), ChunkMerge::merge);
@@ -200,9 +184,8 @@ class RegionIntegrationTest {
     }
 
     /**
-     * The un-opened half of the container carry-forward, driven through the composed read-merge the flush actually
-     * builds. A chest's contents exist on the client only while its menu is open, so a re-walk re-captures the terrain
-     * and sees an empty chest; nothing but the region file says whether the earlier flush's items survived that write.
+     * A chest's contents exist on the client only while its menu is open, so a re-walk re-captures the terrain and sees
+     * an empty chest.
      */
     @Test
     void aReWalkedChestKeepsWhatAnEarlierFlushWroteIntoTheRegionFile(@TempDir Path save) throws IOException {
@@ -232,9 +215,8 @@ class RegionIntegrationTest {
     }
 
     /**
-     * The opened half, and the reason it cannot be told from a plain re-walk by the tags alone: both fresh sides carry
-     * the same present-but-empty {@code "Items"}, and only the open-time positions the flush derives separate a
-     * container this write looked inside from one it merely re-captured.
+     * Both fresh sides carry the same present-but-empty {@code "Items"}, and only the open-time positions the flush
+     * derives separate a container this write looked inside from one it merely re-captured.
      */
     @Test
     void aChestOpenedAndFoundEmptyIsWrittenEmptyIntoTheRegionFile(@TempDir Path save) throws IOException {
@@ -262,8 +244,6 @@ class RegionIntegrationTest {
                     ChunkFlushPlan.readMerge(emptied, landing, LongSet.of()));
             out.synchronize(true).join();
 
-            // Without these the case cannot tell the skip firing from the merge never running at all, which is
-            // the same green either way.
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_RECAPTURED, written.outcome(),
                     "the prior chunk was found on disk, so the merge really ran over it");
             assertEquals(0, written.mergeBacks(), "and carried nothing back into the container it captured");
@@ -278,7 +258,6 @@ class RegionIntegrationTest {
         }
     }
 
-    /** A captured chunk snapshot whose one chest at {@code pos} holds each named item. */
     private static ChunkSnapshotSource chestSnapshot(RegistryAccess.Frozen registries, BlockPos pos,
             String... itemIds) {
         CompoundTag chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
@@ -286,7 +265,6 @@ class RegionIntegrationTest {
         return SyntheticChunks.fullWithBlockEntities(registries, true, List.of(chest));
     }
 
-    /** A captured chunk whose one chiseled bookshelf holds a book at each named slot. */
     private CompoundTag bookshelfChunk(RegistryAccess.Frozen registries, int... slots) {
         CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
         CompoundTag shelf = blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, 4, 64, 9);

@@ -8,11 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The {@code skipVoidChunks} decision: a chunk is void (skippable) only when it carries nothing worth saving. The
- * invariant: a chunk with any captured entity, block-entity, container, or non-air block is NOT void, so dropping it
- * (and its {@code allCaptured} position) can never destroy captured data.
- */
 class VoidChunkPolicyTest {
     @Test
     void anEmptyAllAirChunkIsVoid() {

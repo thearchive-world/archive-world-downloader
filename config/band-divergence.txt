@@ -29,14 +29,14 @@ common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 # and this build script gates the automated capture-verification tier behind that flag.
 fabric/build.gradle.kts
 
-# Fabric API 0.114.1 for 1.21.3 draws the HUD overlay through HudRenderCallback, unconditionally after the whole
-# vanilla HUD; fabric-api 0.119.4 for 1.21.4 moves to HudLayerRegistrationCallback with an IdentifiedLayer, and
-# 0.141.4 for 1.21.11 to HudElementRegistry.addLast on an Identifier.
+# 1.21.3's Fabric API draws the HUD overlay through HudRenderCallback, unconditionally after the whole vanilla HUD;
+# 1.21.4's fabric-api moves to HudLayerRegistrationCallback with an IdentifiedLayer, and 1.21.11's to
+# HudElementRegistry.addLast on an Identifier.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# fabric-api 0.114.1 for 1.21.3 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
-# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+# 1.21.3's fabric-api registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager; 26.1's fabric-api renamed them
+# KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -49,14 +49,10 @@ fabric/src/gametest/
 # 1.21.5, no RespawnData accessors until 1.21.9, no environmentAttributes until 1.21.11), so the stubbed overrides
 # differ.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
-# Below 1.21.5 ItemEnchantments.STREAM_CODEC carries a trailing showInTooltip boolean after the level map, which
-# 1.21.5 dropped, so the hand-written wire form appends it.
-common/src/test/java/world/thearchive/wdl/testsupport/BadStacks.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
 # 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
-# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
-# assertions rely on -1.
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
 # Below 1.21.5 CompoundTag.getList takes a type id and getInt and ListTag.getCompound return the value itself (Optional
@@ -77,6 +73,8 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMount
 # void form does, so the test assigns it explicitly with setLeashData.
 common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
 
-# Items.COPPER_HELMET arrives at 1.21.9 and EntityType.PARCHED at 1.21.11, so their assertions are absent and the
-# header stamp names 1.21.3.
+# Items.COPPER_HELMET arrives at 1.21.9 and EntityType.PARCHED at 1.21.11, so their assertions are absent.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
+
+# Below 1.21.4 no screen gametest reads WdlDownloadsScreen.restoreChipBox, so the public method carries no Javadoc.
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java

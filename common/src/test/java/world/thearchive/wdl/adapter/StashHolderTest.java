@@ -14,11 +14,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.ItemFixtures;
 
-/**
- * The pack/unpack round-trip guard for {@link StashHolder}: a compacted holder decodes back to a tag deep-equal to the
- * original (so the drain merges exactly what was stashed), a fresh holder hands back its live tree, and compacting
- * twice is a no-op.
- */
 class StashHolderTest {
     private static CompoundTag nestedHolder() {
         CompoundTag holder = ItemFixtures

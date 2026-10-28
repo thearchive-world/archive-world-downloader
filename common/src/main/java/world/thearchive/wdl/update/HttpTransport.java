@@ -17,10 +17,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The production {@link Transport}: short timeouts, no redirects, a size-capped body, and every exception mapped to the
- * failure sentinel so a dead network can never surface past the seam.
- */
 public final class HttpTransport implements Transport {
     private static final Duration TIMEOUT = Duration.ofSeconds(3);
     /** The update check reads a short version list; a body past this is a hostile endpoint, not a real reply. */
@@ -49,7 +45,7 @@ public final class HttpTransport implements Transport {
 
     /**
      * Buffers the response as a UTF-8 string but cancels the exchange and fails once the body exceeds {@code capacity}
-     * bytes, so a hostile endpoint cannot force an unbounded allocation on the check thread.
+     * bytes, so a hostile endpoint cannot force an unbounded allocation.
      */
     static final class BoundedBodySubscriber implements HttpResponse.BodySubscriber<String> {
         private final HttpResponse.BodySubscriber<String> delegate = HttpResponse.BodySubscribers

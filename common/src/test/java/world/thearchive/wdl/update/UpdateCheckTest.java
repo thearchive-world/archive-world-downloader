@@ -16,10 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * The launch-scoped orchestrator: opt-out before any request, at-most-once dispatch off the calling thread, one
- * published result, and the chat latch and banner dismissal semantics.
- */
 class UpdateCheckTest {
     private static final String OLDER_BODY = UpdateFixtures.WELL_FORMED_BODY.replace("3.9.5+26.1-fabric", "0.9.0");
 
