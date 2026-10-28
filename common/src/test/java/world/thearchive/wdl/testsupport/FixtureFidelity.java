@@ -20,27 +20,11 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ItemListNbt;
 
-/**
- * The fixture-fidelity gate: proves a fixture tag carries the shape the vanilla producer that would have written it
- * actually emits.
- *
- * <p>The property gated is a fixed point of the producer's own decode then encode. A block-entity tag is fed to
- * {@link TileEntity#create} and saved back through {@link TileEntity#writeToNBT}; an {@code "Items"} holder is fed to
- * {@link ItemListNbt#loadAllItems} and saved back through {@link ItemListNbt#saveAllItems}. A fixture built from a
- * mental model rather than from the producer differs from its own round trip, because the producer writes keys
- * unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and each block
- * entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the test
- * passes for a reason unrelated to the behavior it names.
- *
- * <p>Nothing here is a key list to maintain. The producer is called, so the expected shape follows the band the tests
- * compile against.
- */
 public final class FixtureFidelity {
     private static @Nullable Map<String, IBlockState> representativeStates;
 
     private FixtureFidelity() {}
 
-    /** A freshly placed block entity of type {@code blockEntityId} at {@code x/y/z}, with no world behind it. */
     public static TileEntity newBlockEntity(String blockEntityId, int x, int y, int z) {
         BlockPos pos = new BlockPos(x, y, z);
         IBlockState state = representativeState(blockEntityId);
@@ -48,29 +32,18 @@ public final class FixtureFidelity {
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: " + state.getBlock() + " hosts no block entity at " + pos);
         }
-        // The fresh block entity carries no position, so it sits at the origin; set its position or save writes
-        // x/y/z of 0,0,0 instead of the requested cell.
         blockEntity.setPos(pos);
         return blockEntity;
     }
 
-    /** What vanilla writes for {@code blockEntity}, the same call the chunk save makes. */
     public static NBTTagCompound save(TileEntity blockEntity) {
         return blockEntity.writeToNBT(new NBTTagCompound());
     }
 
-    /**
-     * The tag vanilla writes for a freshly placed block entity of {@code blockEntityId} at {@code x/y/z}: every
-     * always-written key at its default, and nothing else.
-     */
     public static NBTTagCompound blockEntityShape(String blockEntityId, int x, int y, int z) {
         return save(newBlockEntity(blockEntityId, x, y, z));
     }
 
-    /**
-     * Fail unless {@code blockEntityTag} is exactly what vanilla would write for the state it describes. Nothing is
-     * exempt: this band's chunk layer appends the block entity's own save and adds no key of its own around it.
-     */
     public static void assertBlockEntityShape(NBTTagCompound blockEntityTag) {
         NBTTagCompound subject = blockEntityTag.copy();
 
@@ -92,11 +65,6 @@ public final class FixtureFidelity {
         }
     }
 
-    /**
-     * Fail unless {@code holderTag}'s {@code "Items"} list is exactly what {@link ItemListNbt#saveAllItems} emits for
-     * the stacks it decodes to. Catches an entry missing {@code "Slot"}, whose load silently lands every such entry on
-     * slot 0.
-     */
     public static void assertItemsHolderShape(NBTTagCompound holderTag) {
         NBTBase rawItems = holderTag.getTag("Items");
         if (rawItems != null && !(rawItems instanceof NBTTagList)) {
@@ -118,10 +86,6 @@ public final class FixtureFidelity {
         }
     }
 
-    /**
-     * A container wide enough to hold every slot the list names, so the round trip is testing the entries' shape rather
-     * than the load dropping an out-of-range one.
-     */
     private static int containerSize(NBTTagList items) {
         int highest = -1;
         for (int i = 0; i < items.tagCount(); i++) {
@@ -131,7 +95,6 @@ public final class FixtureFidelity {
         return highest + 1;
     }
 
-    /** The default state of some block hosting {@code blockEntityId}, for the load side of the round trip. */
     private static IBlockState representativeState(String blockEntityId) {
         IBlockState state = representativeStates().get(blockEntityId);
         if (state == null) {
@@ -156,9 +119,6 @@ public final class FixtureFidelity {
             if (blockEntity == null) {
                 continue;
             }
-            // The id is read off the save vanilla itself writes, which throws for a class it maps no id for rather
-            // than returning nothing. Skipping rather than propagating keeps one unmappable class from failing every
-            // fixture check instead of only the fixtures that name it.
             String key;
             try {
                 key = save(blockEntity).getString("id");

@@ -10,11 +10,6 @@ import net.minecraft.nbt.NBTTagCompound;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
-/**
- * Shared map-item-holder NBT fixtures for the map archive tests: a filled-map stack, a container item nesting one, and
- * the captured {@code Items} holder they serialize into. Hoisted here so the id collector, remap, and archive tests
- * share one copy rather than each carrying its own.
- */
 public final class MapHolderFixtures {
     private MapHolderFixtures() {}
 
@@ -27,9 +22,7 @@ public final class MapHolderFixtures {
     }
 
     /**
-     * A container item whose {@code tag.BlockEntityTag.Items} nests {@code contents}. {@code ItemBlock} copies that
-     * compound onto the placed block entity at this band, so a command-given chest carrying it is a live shape rather
-     * than a synthetic one.
+     * A container item whose {@code tag.BlockEntityTag.Items} nests {@code contents}.
      */
     public static ItemStack containerHolding(ItemStack... contents) {
         ItemStack container = new ItemStack(Blocks.CHEST);

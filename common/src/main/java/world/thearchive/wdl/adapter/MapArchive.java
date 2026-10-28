@@ -14,24 +14,11 @@ import world.thearchive.wdl.core.MapHash;
 import world.thearchive.wdl.core.MapManifest;
 
 /**
- * The on-sight map archive: the live remap table that resolves a server's session-local map id to a content-stable
- * archive id and streams each received map's data to the injected {@link MapDataSink} at its first imaged sighting, so
- * a crashed capture keeps the maps it already saw. A map in a chest whose chunk flushes mid-roam is captured before the
- * holder drains rather than being lost at finish (the unload fix). It wraps a {@link MapManifest} (the persisted
- * hash-to-id table and the shared monotonic counter), memoizes each session id's resolution, and streams each archive
- * id's data exactly once.
- *
- * <p>The resolution is imaged-sticky and imageless-upgradeable: an id first seen without colors (a chest-only map)
- * takes a fresh counter id, but if the same id is later seen with colors (carried, so the server sent them) it upgrades
- * to the content-dedup archive id, so a carried map always renders. The remap rewrite is single-pass: each captured
- * holder is a fresh serialized copy and is remapped exactly once, at the point it is consumed.
- *
- * <p>The three hashed fields are read off the serialized inner {@code "data"} tag with the plain NBT getters; at this
- * band the dimension is an int id, hashed by its string form. {@code locked} and the centers are excluded from the
- * hash.
+ * In remap mode the resolution is imaged-sticky and imageless-upgradeable: an id first seen without colors takes a
+ * fresh counter id, but if the same id is later seen with colors it upgrades to the content-dedup archive id, so a
+ * carried map renders.
  */
 final class MapArchive {
-    /** Resolves a session-local map id to its serialized inner data tag, or null if the colors were not received. */
     @FunctionalInterface
     public interface ImageResolver {
         @Nullable
@@ -39,9 +26,8 @@ final class MapArchive {
     }
 
     /**
-     * Receives each map's serialized inner data tag exactly once, at its first imaged sighting (the on-sight stream to
-     * disk). The id is the archive id in remap mode and the verbatim server id in off mode. Must not throw: the id is
-     * marked imaged at the fire, so a throw would leave it marked with nothing streamed this session.
+     * Must not throw: the id is marked imaged at the fire, so a throw would leave it marked with nothing streamed this
+     * session.
      */
     @FunctionalInterface
     public interface MapDataSink {
@@ -54,8 +40,6 @@ final class MapArchive {
     private int identityHighWater;
     private final Map<Integer, Integer> archiveIdBySessionId = new LinkedHashMap<>();
     private final MapDataSink dataSink;
-    // The ids already streamed once (archive ids in remap mode, verbatim server ids in off mode). The
-    // write-once and stickiness gate; never exposed, so the primitive set stays unboxed.
     private final IntOpenHashSet imagedIds = new IntOpenHashSet();
 
     public MapArchive(MapManifest manifest, ImageResolver resolver, MapDataSink dataSink) {
@@ -75,30 +59,25 @@ final class MapArchive {
         return manifest;
     }
 
-    /**
-     * The archive id for {@code sessionId}: memoized so repeated occurrences resolve consistently. An imaged resolution
-     * is sticky and dedups by content hash; an imageless one takes a fresh counter id but upgrades if the same id is
-     * later seen imaged. The image data is streamed exactly once per archive id.
-     */
     public int archiveIdFor(int sessionId) {
         if (!remap) {
             return identityIdFor(sessionId);
         }
         Integer cached = archiveIdBySessionId.get(sessionId);
         if (cached != null && imagedIds.contains(cached.intValue())) {
-            return cached; // already imaged: sticky and idempotent
+            return cached;
         }
         NBTBase dataTag = resolver.resolve(sessionId);
         if (dataTag != null) {
             int archiveId = manifest.lookupOrInsert(hashOf(dataTag));
             if (imagedIds.add(archiveId)) {
-                dataSink.accept(archiveId, dataTag); // first image of this content: stream it now
+                dataSink.accept(archiveId, dataTag);
             }
             archiveIdBySessionId.put(sessionId, archiveId);
             return archiveId;
         }
         if (cached != null) {
-            return cached; // still imageless: keep the id already allocated for it
+            return cached;
         }
         int archiveId = manifest.allocateImageless();
         archiveIdBySessionId.put(sessionId, archiveId);
@@ -106,8 +85,7 @@ final class MapArchive {
     }
 
     /**
-     * Off-mode resolution: the archive id is the original session id. The image is still streamed on-sight (keyed by
-     * the original id), and the id raises the idcounts high-water even when imageless, so a reopened world never
+     * The id raises the idcounts high-water even when imageless, so the reopened world of a finished download never
      * re-issues it. Re-resolves an id first seen imageless so a later carried copy still images it.
      */
     private int identityIdFor(int sessionId) {
@@ -115,7 +93,7 @@ final class MapArchive {
         if (!imagedIds.contains(sessionId)) {
             NBTBase dataTag = resolver.resolve(sessionId);
             if (dataTag != null) {
-                imagedIds.add(sessionId); // imaged sightings only: a null resolve must stay upgradeable
+                imagedIds.add(sessionId);
                 dataSink.accept(sessionId, dataTag);
             }
         }
@@ -123,37 +101,24 @@ final class MapArchive {
     }
 
     /**
-     * Rewrite every map id referenced by {@code holder}'s {@code listKey} list to its archive id, recursing into nested
-     * item lists, and stream each first-imaged map's data on the way (the on-sight stream). Single-pass: call exactly
-     * once per captured holder.
+     * Single-pass in remap mode: call exactly once per captured holder.
      */
     public void remap(NBTTagCompound holder, String listKey) {
         MapIdRemap.remapFromItemList(holder, listKey, this::archiveIdFor);
     }
 
     /**
-     * Remap (and on-sight stream) the maps referenced by a single entity-borne item (an item frame's or a dropped item
-     * entity's {@code "Item"}). Single-pass: call exactly once per captured entity item.
+     * Single-pass in remap mode: call exactly once per captured entity item.
      */
     public void remapItem(NBTTagCompound item) {
         MapIdRemap.remapItem(item, this::archiveIdFor);
     }
 
-    /**
-     * The finalize-time idcounts tag, floored at the counter high-water so the reopened world's allocator issues the
-     * next id above every captured id, or null when no id was referenced or seeded this session. The
-     * {@code map_<id>.dat} files themselves stream through the sink at first image.
-     */
     public @Nullable NBTBase idCountsTag() {
         int highWater = remap ? manifest.highestAssignedId() : identityHighWater;
         return highWater >= 0 ? MapDataWriter.serializeIdCounts(highWater) : null;
     }
 
-    /**
-     * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension; {@code locked}
-     * and the centers are excluded. At this band the map data stores its dimension as an int id, so it is hashed by its
-     * string form.
-     */
     static String hashOf(NBTBase dataTag) {
         if (!(dataTag instanceof NBTTagCompound)) {
             return MapHash.of(new byte[0], 0, "");

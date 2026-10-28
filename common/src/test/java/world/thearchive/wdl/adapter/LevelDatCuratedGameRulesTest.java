@@ -18,12 +18,6 @@ import world.thearchive.wdl.core.CuratedGameRule;
 import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The curated game-rule set surfaced across the SPI for the settings menu: each curated safe rule with its curated
- * (safe) value and the two toggle-position values, computed from the live {@code GameRules} so the menu never
- * re-hardcodes a band-specific set. The band-neutral order carries rows whose rule a band may not have, and the menu
- * skips those order slots.
- */
 class LevelDatCuratedGameRulesTest {
     /**
      * The band ids of the curated superset, restated rather than read back from the plug so the expected count stays
@@ -34,7 +28,7 @@ class LevelDatCuratedGameRulesTest {
             "doWardenSpawning", "doTraderSpawning", "doPatrolSpawning");
 
     private Map<String, CuratedGameRule> curated() {
-        TestRegistries.bootstrap(); // bootstrap the vanilla registries so a default GameRules can be built
+        TestRegistries.bootstrap();
         Map<String, CuratedGameRule> byId = new LinkedHashMap<>();
         for (CuratedGameRule rule : new LevelDataWriterImpl().curatedGameRules()) {
             byId.put(rule.id(), rule);

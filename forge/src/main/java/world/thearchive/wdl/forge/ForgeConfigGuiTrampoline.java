@@ -11,8 +11,7 @@ import world.thearchive.wdl.Wdl;
 /**
  * The screen class {@link ForgeConfigGuiFactory} answers with. The mods list opens that answer by calling a public
  * {@code (GuiScreen)} constructor on it, and the shared settings screen is final with a wider constructor, so this
- * band-local screen carries that constructor shape and hands control to the settings screen with the screen it was
- * opened from as the back target. It is never drawn: the handover happens before the first frame.
+ * band-local screen carries that constructor shape.
  */
 public final class ForgeConfigGuiTrampoline extends GuiScreen {
     private final @Nullable GuiScreen parent;
@@ -21,8 +20,7 @@ public final class ForgeConfigGuiTrampoline extends GuiScreen {
         this.parent = parent;
     }
 
-    // The handover cannot move to the constructor: mc is still null there, and the mods list displays this screen
-    // immediately after the constructor returns, so a screen opened from the constructor is covered over again.
+    // The handover cannot move to the constructor: mc is still null there.
     @Override
     public void initGui() {
         mc.displayGuiScreen(Wdl.createSettingsScreen(parent));

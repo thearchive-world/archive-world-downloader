@@ -17,10 +17,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the entity-id gate {@link EntityFixtures} stamps every fixture through. A hand-built fixture id is the one part
- * of an entity tag no producer checks, so without this a whole suite can agree on an archive this band never writes.
- */
 class EntityIdRegistryTest {
     private static final String STALE = "minecraft:chest_minecart";
     private static final String LIVE = "MinecartChest";
@@ -70,9 +66,8 @@ class EntityIdRegistryTest {
         gateOnly.removeAll(written);
         Set<String> writtenOnly = new HashSet<>(written);
         writtenOnly.removeAll(gate);
-        // The two sets differ only by the lightning bolt, which getEntityNameList appends without a mapping, and by
-        // the two abstract classes it drops. Anything else differing means the gate reads a set other than the one a
-        // load resolves a saved id against.
+        // The two sets differ only by the lightning bolt, which getEntityNameList appends without a mapping, and by the
+        // two abstract classes it drops.
         assertEquals(new HashSet<>(Arrays.asList("LightningBolt")), gateOnly);
         assertEquals(new HashSet<>(Arrays.asList("Mob", "Monster")), writtenOnly);
     }

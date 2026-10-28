@@ -129,231 +129,83 @@ import world.thearchive.wdl.core.report.SaveChunks;
 import world.thearchive.wdl.core.report.WorldIconWriter;
 import world.thearchive.wdl.platform.PlatformBridge;
 
-/**
- * The live, MC-typed capture session behind the MC-free {@link CaptureController.Session} seam.
- *
- * <p>Bound to one {@link WorldClient}. Each tick (client main thread) it snapshots each loaded chunk of that level
- * once, by walking the render-distance square around the player and reading the client chunk cache directly (no packet
- * Mixin). The codec reads the chunk's server-sent light from the client light engine, gated per chunk on the engine's
- * initial-light-applied bit, so a captured chunk skips vanilla's first-open relight; a chunk whose light has not yet
- * applied falls back to {@code lightCorrect=false} and vanilla relights just that chunk. The whole per-chunk snapshot
- * runs here on the main thread.
- *
- * <p>Captured chunk tags do not accumulate to the end: each tick the flush pump streams every tag that has moved out of
- * the keep-hot window around the player to a background {@link AsyncSaveWriter} and drops it from memory, so the
- * in-memory buffer stays bounded by a hot square no matter how far the capture roams. Only fully-encoded immutable tags
- * cross to the writer thread. {@code finish()} drains the remaining buffer, snapshots and encodes the live entities,
- * writes level.dat, and reports the saved world when the background drain completes; none of it on the render thread.
- */
 public final class LiveCaptureSession implements CaptureController.Session {
     private static final Logger LOGGER = LogManager.getLogger(LiveCaptureSession.class);
 
-    /** Sentinel for {@link #openContainerId} when no container menu is currently open. */
     private static final int NO_MENU = -1;
 
-    // How many chunks past the render-distance capture square to keep buffered before flushing to disk.
-    // Containers are opened far inside render distance, so any non-negative margin keeps merge-before-flush
-    // correct; +2 just keeps a small band past the capture square so a chunk is not flushed the instant it
-    // leaves it. The buffer is therefore bounded by the (renderDistance + this) square around the player,
-    // independent of how far the capture roams.
     private static final int KEEP_HOT_MARGIN = 2;
 
-    // Re-capture: the immediate edit zone is the (2*radius+1) square around the player, re-encoded
-    // unconditionally so the player's own nearby edits (including block-entity-data edits like sign text,
-    // which never flip a chunk's unsaved flag) stay current. Radius 1 is the 3x3 surroundings.
     private static final int EDIT_ZONE_RADIUS = 1;
-    // The edit zone runs on a coarse cadence (once per second) rather than every tick: a per-encode cost
-    // measurement showed an every-tick 3x3 is a continuous main-thread cost out of step with the "few-second
-    // latency is immaterial" premise, so the immediate-area freshness guarantee is instead carried by a
-    // save-time re-capture burst, and this cadence only lowers in-session latency for the player's vicinity.
     private static final int EDIT_ZONE_PERIOD_TICKS = 20;
-    // Stats refresh cadence: re-request the async stats counter every 3 min so finish reads a
-    // near-live copy. Low-stakes value: stats are lifetime-cumulative, so a few minutes' staleness is a
-    // rounding error against an hours-plus counter. 3600 ticks = 3 min at 20 tps.
     private static final int STATS_REFRESH_PERIOD_TICKS = 3600;
     private static final int TICKS_PER_SECOND = 20;
 
-    /** The wdl-private subfolder under the save root (mirrors the download report's location). */
     private static final String WDL_SUBFOLDER = "wdl";
 
-    // Vanilla publishes no class-to-id accessor here, so reading one id means serializing the whole block entity (a
-    // chest's 27 slots included), and the outline rescan asks per container per rescan on the tick thread. The empty
-    // string is cached for a class vanilla maps no id for, since the probe throws for those and the throw would
-    // otherwise repeat on every rescan the block entity stays in.
     private static final Map<Class<?>, String> blockEntityTypeIds = new ConcurrentHashMap<>();
 
     private final VersionAdapter adapter;
     private final PlatformBridge bridge;
     private final BobbyChunkFilter bobbyFilter;
     private final WdlConfig config;
-    // The game-thread completion poke (CaptureController.tick), run when the background save completes so the
-    // SAVING to IDLE transition lands even while a replay's paused timer has suspended the game tick.
+    // Run when the background save completes so the SAVING to IDLE transition lands even while a replay's paused timer
+    // has suspended the game tick.
     private final Runnable saveCompletePoke;
     private final SavedChunkIndex overlayIndex;
-    // The covered half of the two-tone overlay: the chunks the recording path brought within entity send range,
-    // fed a disc at a time from captureTick. The per-crossing disc feed stays unconditional like the saved
-    // record-site; only the resume prior-coverage seed is gated on overlayActive.
     private final CoveredChunkIndex coveredIndex;
-    // The live send-range estimator (owned by the controller): sizes each coverage disc and gates the cold-start
-    // read. One per-dimension running max over the three sampler-gated feeds (arrivals, removals, and the seed
-    // sweep in captureTick), clamped to the live render distance at read; the per-center caps recorded with the
-    // trail keep the retroactive paint honest when the max grows.
     private final SendRangeEstimator sendRange;
-    // The last chunk center a coverage disc was recorded around, so the disc is re-added only when the player
-    // crosses into a new chunk rather than every tick. Null at construction and after a dimension rebind, so the
-    // first tick in a dimension seeds its disc under the correct live-id partition.
     private @Nullable ChunkPos lastCoveredCenter;
-    // The radius the covered trail was last laid at this dimension, re-read every tick so a changed radius (the
-    // running max growing on a new sample, or the render-distance clamp dropping) triggers one recompute over
-    // the whole trail rather than leaving the earlier path covered at the stale radius. Reset to 0 with
-    // lastCoveredCenter on a dimension rebind, since the covered set is per dimension.
     private int lastCoveredRadius;
-    // The previous tick's player position, the displacement baseline the sampler's speed gate reads at gate-arm.
     // Invalid at construction and after a dimension rebind, so the first guarded tick (and the first after a
     // cross-dimension jump) arms with displacement 0 instead of a spurious fast tick.
     private double lastTickPlayerX;
     private double lastTickPlayerZ;
     private boolean tickBaselineValid;
-    // Weak so a session outliving a disconnect cannot pin the old player, and through it that level's chunks.
     private WeakReference<EntityPlayerSP> lastPlayer = new WeakReference<>(null);
-    // The overlay's resume prior-coverage seed reads region headers off disk only when a map overlay mod
-    // (XaeroPlus or JourneyMap) will consume them; the per-chunk record-site add stays unconditional. Seeded
-    // once per live dimension id.
     private final boolean overlayActive;
     private final Set<String> overlaySeededDimensions = new HashSet<>();
-    // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME). On a
-    // RESUME that does not re-open the ender chest, its prior contents carry forward from the prior level.dat.
     private final DownloadTarget target;
-    // The WorldClient currently being captured. Non-final: the session follows the player across a portal,
-    // rebinding to the new dimension's level, so this advances with targetDimension and allCaptured. Null on a
-    // session built by the level-free constructor, so dereference it only through level(). The two bound-chunk
-    // assert canaries compare it raw instead, because a throwing call inside an assert would make its own
-    // evaluation depend on -ea; they are safe only because a level() call already ran earlier in the chain,
-    // which for reencode means its callers, since it takes its chunk source as a parameter.
     private @Nullable WorldClient level;
-    // The vanilla single-player dimension this capture is laid out under, chosen by the captured
-    // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
-    // still write to the vanilla dimension's own folder, not one derived from the custom level key.
-    // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
     private DimensionType targetDimension;
-    // The server's OWN key for the dimension being captured, as the id string the packet-side per-dimension
-    // stores share, which on a Multiverse/Paper server is not the vanilla-mapped targetDimension above. It is
-    // the identity the inbound tee stamps each held entity with, so the promote gate compares a held frame
-    // against the world it was announced in rather than against a position set from another world. Rebound on
-    // a dimension change, like targetDimension.
     private String liveDimensionId;
 
-    /**
-     * What a dimension change does to every store whose contents belong to one dimension. The stores register with it
-     * at construction and it owns the order they are drained, swapped, and cleared in.
-     */
     private final DimensionRebind<DimensionType> dimensionRebind = new DimensionRebind<>();
 
-    /**
-     * The bounded keep-hot working buffer: captured chunk snapshots not yet flushed to disk, keyed by position
-     * (insertion order preserved). A chunk leaves here once it is farther than the keep-hot radius from the player and
-     * is streamed to the writer (which runs the heavy encode), so this never grows with the area roamed. It holds
-     * snapshots, not encoded tags, because the serialize is deferred to the writer thread.
-     */
     private final Map<ChunkPos, ChunkSnapshotSource> captured = new LinkedHashMap<>();
 
-    /**
-     * Captured chunk positions per dimension (as {@link ChunkPos#asLong(int, int)}), retained for the whole session:
-     * the position space is dimension-local (the overworld and the nether share positions), so following the player
-     * across a portal must not let one dimension's captures dedup the other's. {@link #allCaptured} references the
-     * current dimension's set; this map backs the per-dimension chunk count at finish.
-     */
     private final Map<DimensionType, LongOpenHashSet> capturedByDimension = new LinkedHashMap<>();
 
-    /**
-     * The current dimension's captured-position set (a reference into {@link #capturedByDimension}, swapped on a
-     * dimension rebind): it dedups re-captures, backs the entity-chunk {@code ∩} terrain-chunk privacy gate, and
-     * survives a flush-and-drop of the chunk tag. Positions are tiny, so this stays small even when the chunk tags
-     * themselves must stream to disk.
-     *
-     * <p>The empty instance here is a placeholder that definite initialization needs and nothing reads: the
-     * constructor's {@link DimensionRebind#bind} replaces it with the starting dimension's own set, which is also the
-     * only place the swap is expressed, so the reset list cannot fall out of step with the stores.
-     */
     private LongOpenHashSet allCaptured = new LongOpenHashSet();
 
-    /**
-     * Positions a block-STATE change marked unsaved since the last re-encode, found by {@link #pollDirtyChunks}'s
-     * per-tick walk of the keep-hot buffer (change-driven, low-latency rung). This band has no unsaved-listener push to
-     * be fed from, so the set is filled by pull and nothing outside this session ever writes it. A bounded slice is
-     * drained and re-encoded each tick. Nulled at {@link #finish()} teardown to release it.
-     */
     private @Nullable LongOpenHashSet dirty = new LongOpenHashSet();
 
     /**
-     * The always-on round-robin floor's work queue over the hot buffer: refilled from {@link #captured}'s keys when
-     * drained, so every hot chunk is re-encoded within the configured period. It is the only rung that catches
-     * block-entity-data edits (sign/lectern/banner text), which never mark a chunk unsaved.
+     * It catches sign text the server sends, which never marks a chunk unsaved.
      */
     private final ArrayDeque<ChunkPos> floorQueue = new ArrayDeque<>();
 
-    /** Positions first-captured on the current tick, so the edit zone does not redundantly re-encode them. */
     private final LongOpenHashSet capturedThisTick = new LongOpenHashSet();
 
-    /** Client ticks elapsed while capturing, driving the edit zone's coarse cadence. */
     private long captureTicks;
 
-    /**
-     * The wall-clock deadline ({@link System#nanoTime}) for this tick's chunk capture and entity encode: one shared
-     * per-tick time budget drained new-capture-first, then the re-capture floor slice, then the entity encode, so
-     * loading a fresh render-distance square or flying fast spills across ticks instead of stuttering one frame. The
-     * chunk passes only capture (snapshot) on this thread; the heavy serialize runs on the writer.
-     * {@link Long#MAX_VALUE} means unbounded, the state between ticks and at finish (the finish drain must capture
-     * every chunk and encode every entity still loaded). The field keeps its name for the unchanged
-     * {@code encodeBudgetMillis} config key.
-     */
     private long encodeDeadlineNanos = Long.MAX_VALUE;
 
-    /**
-     * Whether the writer is held off the loader's registries, so a writer opened while the hold is on is born held
-     * rather than free-running into the rebuild.
-     */
     private boolean encodeQuiesced;
 
-    /** Cached nearest-first capture offsets, rebuilt only when the render distance changes (a per-tick array). */
     private int @Nullable [] ringOffsetsCache;
     private int ringOffsetsRadius = -1;
 
-    /** The MC-free guard deciding which block a freshly-opened container menu binds to. */
     private final ContainerAssociation association = new ContainerAssociation();
 
-    /** The open menu's change gate: the per-tick stash re-serializes only when this reports a change. */
     private final MenuChangeTracker stashChangeTracker = new MenuChangeTracker();
 
-    /**
-     * Captured container {@code "Items"} holders keyed by block pos; last-seen-while-open wins. Each is merged into its
-     * chunk's tag (and dropped) just before that chunk is flushed, by {@link ContainerMerge#mergeChunkStash}.
-     */
     private final Map<BlockPos, StashHolder> containerStash = new LinkedHashMap<>();
 
-    /**
-     * Captured lectern {@code "Book"}/{@code "Page"} holders keyed by block pos; last-seen-while-open wins. The lectern
-     * axis beside {@link #containerStash}: a book reaches the client only through the open lectern menu's slot 0, so it
-     * is lifted there and merged into its chunk's already-captured lectern block entity (and dropped) just before that
-     * chunk is flushed, by {@link ContainerMerge#mergeLecternChunkStash}.
-     */
     private final Map<BlockPos, StashHolder> lecternStash = new LinkedHashMap<>();
 
-    /**
-     * The captured ender-chest {@code "Items"} holder, last-seen-while-open wins. Unlike the block-keyed stashes the
-     * ender chest is the player's single global inventory, so one field suffices; it is merged into the captured player
-     * tag's {@code "EnderItems"} at {@link #finish()}, not into a chunk block entity (the ender chest reaches the
-     * client only through its open menu, as with the lectern).
-     */
     private @Nullable NBTTagCompound enderChestStash;
 
-    /**
-     * Captured container-vehicle {@code "Items"} holders keyed by entity {@link UUID}; last-seen-while-open wins. The
-     * entity sibling of {@link #containerStash}: a chest minecart, hopper minecart, chest boat, or chest raft reaches
-     * the client only through its open menu, so it is lifted there and merged into its entity's tag in the
-     * {@code entities/} region when that entity's chunk flushes (by {@link EntityContainerMerge#mergeEntityStash},
-     * incidentally again at {@link #finish()}), not into a chunk block entity.
-     */
     private final Map<UUID, NBTTagCompound> entityContainerStash = new LinkedHashMap<>();
     // Captured villager trades by villager UUID, last-seen-wins, mirroring entityContainerStash so the flush's
     // map-id remap allocates archive ids in a deterministic order. A villager whose offers encode threw is
@@ -362,171 +214,78 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final Set<UUID> merchantEncodeFailed = new HashSet<>();
 
     /**
-     * Positions a block placement landed in this session, held per dimension and swapped on a portal like
-     * {@link #capturedBlockKeys}. The on-disk carry-forward matches a fresh block entity to its prior copy on position
-     * and type, which a same-type replacement satisfies, so without this the archived contents of the block that was
-     * there are written onto the one that replaced it on the next visit.
-     *
-     * <p>Drained by the flush that acts on it, like the stashes. What that flush leaves on disk is already
-     * post-placement, so the visit after it carries forward this download's own capture; keeping the position would
-     * instead erase that capture on every later pass, which is the shape a permanent refusal always has.
+     * The on-disk carry-forward matches a fresh block entity to its prior copy on position and type, which a same-type
+     * replacement satisfies, so without this the archived contents of the block that was there are written onto the one
+     * that replaced it on the next visit.
      */
     private final Map<DimensionType, LongOpenHashSet> replacedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet replacedBlockKeys = new LongOpenHashSet();
 
-    /**
-     * The standing captured-set the unsaved-container outline reads: which loaded containers had their rich contents
-     * captured this session, so their rim clears. Populated at the stash content-gate the {@code stash*} family puts at
-     * and, for a placed content-bearing container, the instant the interaction recognizer records it, optimistically
-     * before the flush confirms it, the way the open-time stash marks a chest on open and
-     * {@link #onBookshelfSlotCaptured} marks a bookshelf slot. So membership tracks contents-stashed-for-save, not the
-     * live stash (which drains mid-session and would otherwise re-show a flushed container's rim). Removal is rare and
-     * each case un-stashes the content it un-marks: a lectern whose book is taken back, and a cell a placement lands
-     * in, whose captured block is being replaced ({@link #onBlockPlacedAt}). Block containers, double-chest halves, and
-     * placed containers enter by block pos key, held per dimension and swapped on a portal like {@link #allCaptured} so
-     * a position in one dimension never dedups another's; borne containers enter by globally-unique entity UUID,
-     * staying session-wide, and every ender chest is derived from {@link #enderChestStash} (one shared capture).
-     * Main-thread only, like the rest of capture; the cross-seam view contract is {@link CapturedContainers}.
-     */
     private final Map<DimensionType, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet capturedBlockKeys = new LongOpenHashSet();
-    // The block-entity registry id recorded per captured pos, the one id both staleness gates compare against:
-    // each compares it against a like-for-like id to catch a same-position block replacement. Gate 1 rides
-    // a copy on the drained holder (wdl_block_entity_id) for the writer thread; Gate 2 reads this map through
-    // the outline.
-    // Held per dimension and swapped on a portal like capturedBlockKeys so one dimension's pos never shadows
-    // another's, last-recorded-wins on re-open.
     private final Map<DimensionType, Long2ObjectMap<String>> capturedBlockTypesByDimension = new LinkedHashMap<>();
     private Long2ObjectMap<String> capturedBlockTypes = new Long2ObjectOpenHashMap<>();
-    // The chiseled-bookshelf captured-slot masks the outline reads (per pos, bit n = slot n): a bookshelf is
-    // captured one slot at a time, so a whole-block flag in capturedBlockKeys cannot express it. Held per
-    // dimension and swapped on a portal like capturedBlockKeys, OR-updated when the interaction recognizer
-    // records a book insert.
     private final Map<DimensionType, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
     private Long2IntOpenHashMap bookshelfSlots = new Long2IntOpenHashMap();
     private final Set<UUID> capturedEntityIds = new HashSet<>();
 
-    /**
-     * The resume recovered-coverage scan: on a resumed download the writer thread feeds it each prior on-disk chunk it
-     * carries forward, and it publishes the positions captured in a prior session for the outline to mark recovered.
-     * Wired to the writer in {@link #ensureWriter}; empty on a fresh download.
-     */
     private final RecoveredScan recoveredScan = new RecoveredScan();
 
-    /**
-     * The interaction-captured content prior downloads already saved, banked by the same resume scan that feeds
-     * {@link #recoveredScan} and carried onto an entity that changed entity-chunk since. Empty on a fresh download.
-     */
     private final RecoveredEntityContent recoveredEntityContent = new RecoveredEntityContent();
 
-    // Merchant nodes whose client-invented trade data was dropped before the folds. A diagnostic: on a band whose
-    // vanilla guards the client-side write this stays zero, and a non-zero count is the band handing us trades no
-    // player ever saw.
     private int inventedMerchantOffersDropped;
 
-    // Which chunks have had a recovered-coverage scan requested this dimension, so each on-disk prior is read
-    // once; cleared on a portal so the new dimension re-scans its own chunks (coverage is per dimension).
+    // Cleared on a portal so the new dimension re-scans its own chunks (coverage is per dimension).
     private final LongOpenHashSet recoveryScanned = new LongOpenHashSet();
 
-    /**
-     * The per-tick entity accumulation buffer of already-serialized entity tags, keyed by UUID and drained by
-     * flush-eligibility alongside the terrain so it stays bounded as the player roams. Fed by two sources: the packet
-     * path ({@link #promotePacketEntities}, reconstructing every non-player entity held independent of unload) and the
-     * prime poll ({@link #captureLoadedEntities}, back-filling entities already loaded when the download started).
-     * Touched only on the main thread.
-     */
     private final EntityBuffer entityBuffer = new EntityBuffer();
 
-    /**
-     * The inbound entity packet accumulator, or null when entity capture is off. Every non-player entity that streams
-     * in or reloads after the download starts is captured from this, held independent of unload (the prime poll
-     * {@link #captureLoadedEntities} back-fills those already loaded before it): the per-loader inbound tee feeds it
-     * the spawn, synced-data, equipment, passenger, leash, and movement packets, and the main thread reconstructs and
-     * writes each entity as its chunk leaves the keep-hot window. Published as the connection-scoped active capture so
-     * the tee, which has no session reference, can reach it.
-     */
     private final @Nullable EntityPacketCapture packetCapture;
 
-    /**
-     * The interaction-prediction recognizer, published like {@link #packetCapture} so the per-loader use-block hook can
-     * reach it. Created only when {@code captureContainers} is on (otherwise the hook no-ops); its recording is coupled
-     * to {@code recaptureChunks}, since the reconcile gate can confirm a candidate only against a re-captured snapshot.
-     * Null when interaction capture is off.
-     */
     private final @Nullable InteractionCapture interactionCapture;
 
-    /**
-     * Remembers the block or entity the local player just right-clicked, published like {@link #interactionCapture} so
-     * the per-loader use hooks can reach it, so the open-container bind seeds from the clicked target rather than the
-     * crosshair, which keeps drifting until the menu freezes the camera. Created only when container capture is on (the
-     * bind path's own flag); null otherwise.
-     */
     private final @Nullable OpenClickTracker openClickTracker;
 
-    /** Recognize-and-lift for an open container menu: decide what the menu is and lift its slots into a holder. */
     private final ContainerCapture containerCapture;
 
-    /** Which path is capturing an entity, so its write, skip, or drop is tallied to the right counter. */
     enum EntitySource {
         RECONSTRUCTED, PRIMED
     }
 
     /**
      * The capture source of each entity buffered but not yet submitted, so the write tally is taken at successful
-     * submit, not at buffer time where a later flush throw or null envelope would over-report it. Keyed by the buffer's
-     * UUID; an entry is recorded when an entity is buffered and consumed when its chunk flushes, either to disk
-     * (counted written) or to a flush drop. Main-thread only, like the rest of capture.
+     * submit, not at buffer time where a later flush throw or null envelope would over-report it.
      */
     private final Map<UUID, EntitySource> bufferedEntitySources = new HashMap<>();
 
-    /**
-     * The entities the sink refused at prime time and no prime has since saved, re-offered once at finish. Main-thread
-     * only, like the rest of capture.
-     */
     private final Set<UUID> primeRefusedEntities = new LinkedHashSet<>();
 
     /**
-     * Every entity this session has put into a tag bound for disk, the passengers a vehicle's serialize nests included,
-     * so nothing offers a second copy of one of them.
+     * Every entity this session has buffered for the entity region, the passengers a vehicle's serialize nests
+     * included, so nothing offers a second copy of one of them.
      */
     private final Set<UUID> savedEntities = new HashSet<>();
 
-    /** Reconstructed root entities written this session, tallied at successful submit. */
     private int packetEntitiesWritten;
 
-    /** Primed root entities (loaded before their AddEntity) written this session, tallied at successful submit. */
     private int primedEntitiesWritten;
 
-    /** Held entities dropped at finish because their chunk's terrain was never captured, for the diagnostic. */
     private int droppedUncaptured;
 
     /**
-     * Entities the download ended holding for a dimension other than the one it was bound to, and whose own dimension
-     * had captured the terrain they stand on, so the privacy gate would have let them be written and nothing did.
-     * Ordinarily the stream announced them after the packet that moved it into a world but before the next tick could
-     * follow the player there, so the finish caught them one tick short of the rebind that would have written them; a
-     * rebind drain that threw leaves its remainder here too.
-     *
-     * <p>Counted apart from {@link #droppedUncaptured} rather than folded into it, because that counter asserts the
-     * privacy gate refused the entity. A held frame whose own dimension never captured that terrain IS such a refusal
-     * and goes there instead; only the writable ones, and those whose dimension this download cannot resolve a position
-     * set for at all, are counted here.
+     * Counted apart from {@link #droppedUncaptured} rather than folded into it, because that counter asserts the
+     * privacy gate refused the entity.
      */
     private int unboundDimensionDrops;
 
-    /** Reconstructed entities saved nested in a vehicle (not a written root), for the finish reconciliation. */
     private int nestedPassengers;
 
-    /** Reconstructed entities dropped because the typed entity could not be created or its reconstruct threw. */
     private int createDrops;
 
-    /** Reconstructed entities the sink refused: one of vanilla's own non-saves, so reported and not a loss. */
     private int reconstructSinkSkips;
 
-    /** Reconstructed entities lost because their encode threw or its envelope came back malformed. */
     private int reconstructEncodeFailures;
 
-    /** Reconstructed entities lost when their whole entity-chunk threw or nulled out during flush. */
     private int reconstructFlushDrops;
 
     /**
@@ -536,185 +295,116 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private int drainAbortDrops;
 
-    /**
-     * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means shouldBeSaved returned false (a live passenger saved nested under its vehicle, a
-     * removed entity, or a player-only vehicle vanilla persists through the player) or {@code save()} returned false (a
-     * non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so the drop
-     * is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn packet).
-     */
     private int primeSinkSkips;
 
-    /** Primed entities the encode, a malformed envelope, or the finish re-offer around it destroyed. */
     private int primeEncodeFailures;
 
-    /** Primed entities lost when their whole entity-chunk threw or nulled out during flush; counted, not residual. */
     private int primeFlushDrops;
 
-    /**
-     * The container-vehicle holders already scrubbed and map-remapped, by identity, so each is prepared exactly once
-     * before it merges: a re-opened vehicle's fresh holder is a new object and is prepared again, an old discarded
-     * holder stays harmlessly.
-     */
     private final Set<NBTTagCompound> preparedEntityContainers = Collections.newSetFromMap(new IdentityHashMap<>());
-    // The merchant analog of preparedEntityContainers: an offer holder is scrubbed and map-remapped exactly once,
-    // tracked by identity, since the map remap is not idempotent.
+    // An offer holder is scrubbed and map-remapped exactly once, tracked by identity, since the map remap is not
+    // idempotent.
     private final Set<NBTTagCompound> preparedMerchantHolders = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    /** The UUID of the container vehicle the live menu is bound to, set once at bind time; read by the stash. */
     private @Nullable UUID boundEntityUuid;
 
-    /**
-     * The seated player's mount, captured at finish before the entity drain and attached to the saved player tag as
-     * vanilla's {@code RootVehicle} record ({@link #rootVehicleAttach} is the direct vehicle UUID,
-     * {@link #rootVehicleTag} the root vehicle NBT). Both null unless the player finished riding a vehicle carrying
-     * only itself. Main-thread-only scratch, deliberately not volatile: the RootVehicle NBT crosses to the writer
-     * thread only folded into the immutable {@link CapturedPlayer} through the existing volatile publish.
-     */
     private @Nullable UUID rootVehicleAttach;
 
     private @Nullable NBTTagCompound rootVehicleTag;
 
     /**
-     * The root vehicle and its non-player passengers, held from the standalone entity write so the RootVehicle copy is
-     * not duplicated by a region-file copy on the same UUID.
+     * The root vehicle and its non-player passengers, held from the standalone entity write so the {@code RootVehicle}
+     * copy is not duplicated by a region-file copy on the same UUID.
      */
     private final Set<UUID> excludedRootVehicleUuids = new HashSet<>();
 
     /**
-     * The captured contents of every container vehicle folded into a standalone entity write this session, kept by UUID
-     * after the stash drains. A vehicle's items reach the client only through its open menu, so every serialize after
-     * that first fold is empty; keeping the holder lets a later flush of the same vehicle, in another entity-chunk or
-     * another dimension, be written carrying its contents too, so a reader that reaches any copy finds the loot rather
-     * than an empty vehicle. It does not reduce the archive to one copy; see
-     * {@link EntityContainerMerge#refoldFlushedContainers} for that residual.
-     *
-     * <p>Read at finish as well, where {@link #foldRidingVehicleContents} folds it into the ridden mount's
-     * {@code RootVehicle} tag when the stash has already drained, which is what lets that mount be written whole rather
-     * than skipped.
-     *
-     * <p>Bounded by the number of container vehicles the player opened, each holding one container's worth of items, so
-     * it is a far smaller retention than the block container stash that precedes it.
+     * A vehicle's items reach the client only through its open menu, so every serialize after that first fold is empty;
+     * keeping the holder lets a later flush of the same vehicle, in another entity-chunk or another dimension, be
+     * written carrying its contents too, so a reader that reaches any copy finds the loot rather than an empty vehicle.
      */
     private final Map<UUID, NBTTagCompound> foldedContainerVehicles = new HashMap<>();
     private final Map<UUID, NBTTagCompound> foldedMerchants = new LinkedHashMap<>();
 
-    /**
-     * The finish-snapshot of the local player, assembled on the main thread in {@link #finish()} and read by the writer
-     * thread when the level.dat write runs. Volatile because it crosses that boundary; the writer's queue already
-     * establishes the happens-before, the keyword documents it. Stays null on a disconnect-flush or when the assembly
-     * fails soft, and the level.dat write degrades to the openable void-world output.
-     */
     private volatile @Nullable CapturedPlayer capturedPlayer;
     private volatile @Nullable CapturedProgress capturedProgress;
 
     /**
-     * The on-sight map archive: the live remap table (the persisted manifest, the session-to-archive resolution, and
-     * the streaming gate) that resolves each filled map as it is seen and streams its data through
-     * {@link #streamMapData} at first image, so a map in a container whose chunk flushes mid-roam is captured before
-     * the holder drains rather than lost at finish. Created in {@link #ensureWriter} (where the save path, hence the
-     * manifest, is known) on the main thread before the writer thread starts, so the writer-thread finalizer sees the
-     * reference; the finalizer reads only its idcounts floor, the map files having streamed during capture. The
-     * headless suite binds a caller-built one through {@link #bindWorldOpen}, which reproduces that ordering rather
-     * than resolving anything itself. Stays null only if the world never opened for writing.
+     * Created in {@link #ensureWriter} on the main thread before the writer thread starts, so the writer-thread
+     * finalizer sees the reference.
      */
     private @Nullable MapArchive mapArchive;
 
-    /** The wdl-private map-id manifest file ({@code <save>/wdl/map-ids}); resolved in {@link #ensureWriter}. */
     private @Nullable Path mapIdsFile;
 
-    /** The save's level.dat ({@code <save>/level.dat}); read on a resume to carry the ender chest forward. */
     private @Nullable Path levelDatFile;
 
-    /** containerId of the menu currently tracked, or {@link #NO_MENU} when none is open. */
     private int openContainerId = NO_MENU;
 
-    /** The background writer draining captured tags to disk; opened lazily on the first chunk to flush. */
     private @Nullable AsyncSaveWriter writer;
 
-    // The per-dimension save paths, resolved with the writer in ensureWriter and read by the overlay resume seed
-    // to find each dimension's region folder. Null until the writer opens.
     private @Nullable WorldPaths worldPaths;
 
-    /**
-     * The live finalization phase and fraction for the HUD bar, set on the writer thread as the save drains its phases
-     * (chunks, then the maps batched at finish, then the export zip; a map first imaged during capture streams
-     * unreported, when no bar is drawn) and read each frame on the main thread.
-     */
     private final SaveProgress progress = new SaveProgress();
 
-    /** The error from a failed attempt to open the world for writing; reported at {@link #finish()}. */
     private @Nullable Throwable startError;
 
-    /** Whether the save outcome has been reported to the player (covers the nothing-captured/failure paths). */
     private boolean reported;
 
-    /** The save-directory name (the target's folder, verbatim), used to open the world and report the save. */
     private String saveName;
 
-    /** How many stashed containers were merged into their captured chunk tags (for the saved-world message). */
     private int mergedContainers;
 
-    /** How many stashed lectern books were merged into their captured chunk tags (for the saved-world message). */
     private int mergedLecterns;
 
-    /** How many stashed container vehicles were merged into their captured entity tags (for the saved message). */
     private int mergedEntityContainers;
     private int mergedVillagerTrades;
 
     /**
-     * Captured maps lost to a failed write: the map's own data file, or a map with no writer to stream to, or one
-     * imaged after the finish batch closed. Every increment has a matching per-item loss line naming the map, so a
-     * reader can reconcile the count against the log. A non-zero tally makes the finish partial, not clean. Atomic so
-     * no increment is lost whichever thread runs the write task; that the read sees a complete count is the writer's
-     * queue drain and completed future, not this type.
+     * Every increment has a matching per-item loss line naming the map, so a reader can reconcile the count against the
+     * log. Atomic so no increment is lost whichever thread runs the write task; that the read sees a complete count is
+     * the writer's queue drain and completed future, not this type.
      */
     private final AtomicInteger mapsFailed = new AtomicInteger();
 
     /**
-     * The finalize-time idcounts write, counted apart from {@link #mapsFailed} because it loses no captured map: it is
-     * one shared file whose failure risks the reopened world reissuing captured ids. Folding it in would let the
-     * map-loss count exceed the per-item lines that explain it. Written on the writer thread.
+     * The finalize-time idcounts write, counted apart from {@link #mapsFailed} because it loses no captured map.
+     * Folding it in would let the map-loss count exceed the per-item lines that explain it.
      */
     private int idCountsFailed;
 
     /**
-     * The voice for a captured map lost to its own write. These three are instance fields on purpose: each bounds its
-     * stacks over one download, so hoisting any of them to a static leaves every download after the first with no stack
-     * for a cause the first already spent.
+     * These voices are instance fields on purpose: each bounds its stacks over one download, so hoisting any of them to
+     * a static leaves every download after the first with no stack for a cause the first already spent.
      */
     private final CaptureLossLog mapWriteLoss = new CaptureLossLog(LOGGER,
             "failed to write map data {}", "it renders blank in the reopened world");
 
     /**
-     * The voice for a captured container holder whose map-id remap threw. Says "holder" because this path is handed a
-     * block position for a block container and a UUID for a container vehicle, and a bare UUID here would be
-     * indistinguishable from the framed-item voice's own line.
+     * Says "holder" because this path is handed a block position for a block container and a UUID for a container
+     * vehicle, and a bare UUID here would be indistinguishable from the framed-item voice's own line.
      */
     private final CaptureLossLog mapRemapLoss = new CaptureLossLog(LOGGER,
             "map remap failed for holder {}", "its map renders blank");
 
     /**
-     * The voice for a framed or dropped map item whose remap threw. Kept apart from the holder voice for its own stack
-     * budget, not for its wording: a shared instance would leave whichever path lost second with no stack whenever the
-     * two fail the same way.
+     * Kept apart from the holder voice for its own stack budget, not for its wording: a shared instance would leave
+     * whichever path lost second with no stack whenever the two fail the same way.
      */
     private final CaptureLossLog mapEntityRemapLoss = new CaptureLossLog(LOGGER,
             "map remap failed for entity {}", "its map renders blank");
 
     /**
-     * The voice for a chunk whose terrain snapshot threw. One root cause fails every chunk of a kind alike, and the
-     * square retries a failing position every tick it stays loaded, so this voice's stack budget rides on top of the
-     * per-position dedup in {@link #recordChunkCaptureLoss} rather than instead of it.
+     * One root cause fails every chunk of a kind alike, and the square retries a failing position every tick it stays
+     * loaded, so this voice's stack budget rides on top of the per-position dedup in {@link #recordChunkCaptureLoss}
+     * rather than instead of it.
      */
     private final CaptureLossLog chunkCaptureLoss = new CaptureLossLog(LOGGER,
             "failed to capture chunk {}", "the reopened world has none of that chunk's terrain");
 
     /**
-     * Where {@link #streamMapData} puts a map write once the finish drain has begun, instead of submitting it as its
-     * own uncounted task: the batch is handed to the writer as one unit so it can report the map phase over a known
-     * total. Null while capturing, when each map streams on sight and no bar is drawn anyway, and null again once the
-     * writer owns the batch, so the batched map tags are released rather than held through the rest of the finalize.
+     * Null while capturing, when each map streams on sight and no bar is drawn anyway, and null again once the writer
+     * owns the batch, so the batched map tags are released rather than held through the rest of the finalize.
      */
     private @Nullable List<Runnable> finishMapWrites;
 
@@ -726,112 +416,50 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private boolean finishBatchClosed;
 
     /**
-     * The map-id manifest read lost to a fault. Its consequence lands in this download, which then re-images every map
-     * the folder already holds under fresh ids, and nothing later in the session can undo that, so it counts once and
-     * stays counted. Main thread, at world-open.
+     * Its consequence lands in this download, which then re-images every map the folder already holds under fresh ids,
+     * and nothing later in the session can undo that, so it counts once and stays counted.
      */
     private int mapManifestReadFailed;
 
     /**
-     * Whether the manifest on disk is stale as this download ends. A flag rather than a tally because the file is
-     * written up to twice, the scheme signal at world-open and the authoritative rewrite at finalize, and the second
-     * repairs the first: counting both would report a download partial for a fault that was already healed, and report
-     * two losses where there is one file. Written on the main thread at world-open and on the writer thread at
-     * finalize.
-     *
-     * <p>Held apart from {@link #mapsFailed} for the reason {@link #idCountsFailed} is: no captured map is lost here,
-     * and folding it in would let the map-loss count exceed the per-item lines that explain it.
+     * Held apart from {@link #mapsFailed} for the reason {@link #idCountsFailed} is: no captured map is lost here, and
+     * folding it in would let the map-loss count exceed the per-item lines that explain it.
      */
     private boolean mapManifestStale;
 
-    /** Block-container merges lost to a throw (writer thread); folds into the partial-finish predicate. */
     private int blockContainersFailed;
 
-    /** Container-vehicle merges lost to a throw (main thread); folds into the partial-finish predicate. */
     private int entityContainersFailed;
 
-    /** Captured map items whose id remap threw and now render blank (main thread); folds into the predicate. */
     private int mapsRemapFailed;
 
-    /** Opened container vehicles whose captured contents were never folded into a saved entity (main thread). */
     private int containerVehiclesLost;
     private int villagerTradesLost;
 
-    /**
-     * Predicted interactions (a bookshelf book, a jukebox disc, a placed container) that no chunk flush ever reached,
-     * so nothing of them was written (main thread). Counted at the two whole-buffer drains, the dimension rebind and
-     * the finish, since only what neither reached is unrecoverable.
-     */
     private int interactionCapturesLost;
 
-    /** Entities lost to a whole-entity-chunk flush throw or a create failure, both paths (main thread). */
     private int structuralEntitiesLost;
 
-    /**
-     * A prior download's parked mount the resumed release could not place (main thread). At most one per download,
-     * since the prior player records at most one RootVehicle, and the whole mount rather than a part of it: this
-     * session's own player tag overwrites the only copy it had.
-     */
     private int resumedMountsLost;
 
-    /**
-     * A player record this finish did not get intact from the live client (main thread). At most one per download, and
-     * two shapes: no record at all, the finish having arrived after the teardown, and a record assembled while the
-     * teardown ran under it, whose game mode then silently took a fallback.
-     */
     private int playerRecordsLost;
 
-    /**
-     * Chunks whose terrain snapshot threw, so the position reached neither the buffer nor the captured set and the
-     * reopened world has none of that chunk's terrain, falling back to its own generator there (main thread). Deduped
-     * by {@link #captureFailedByDimension}, since the same position is retried every tick it stays loaded.
-     */
     private int chunksCaptureFailed;
 
-    /**
-     * Finish-time capture steps {@link #failSoft} degraded to absent (main thread). The degradation is deliberate,
-     * since an openable void-world level.dat beats an aborted save; what would not be is stamping the download clean
-     * over it.
-     */
     private int finishStepsFailed;
 
-    /**
-     * The positions {@link #chunksCaptureFailed} has already counted, per dimension: the position space is
-     * dimension-local, so one dimension's failing position must not dedup another's. Held as a plain map rather than a
-     * swapped current-dimension reference like {@link #allCaptured}, because nothing reads it per tick.
-     */
     private final Map<DimensionType, LongOpenHashSet> captureFailedByDimension = new LinkedHashMap<>();
 
-    /**
-     * The per-download report writer (the sentinel at world-open, the rendering from the writer preflight after the
-     * pre-resume backup, complete just before finalize). Fail-soft.
-     */
     private final DownloadReportStore report = new DownloadReportStore();
 
-    /**
-     * Accumulates the report's dedup-correct counts over the session: containers at bind time (a double chest as one),
-     * entities at submit, chunks at finish. Touched only on the client main thread, like the rest of capture. The
-     * player count is settled later (it depends on the write succeeding), not through this.
-     */
     private final DownloadCountsBuilder reportCounts = new DownloadCountsBuilder();
 
-    /** The save root and stamped identity, set when the report begins at world-open; read at finish. */
     private @Nullable Path reportRoot;
     private @Nullable DownloadIdentity reportIdentity;
     private @Nullable ReportEnvironment reportEnvironment;
 
-    /**
-     * The source server's icon bytes, snapshotted on the main thread in {@link #finish()} (where {@code
-     * getCurrentServer()} is live) and read by the writer thread, the same discipline as {@link #capturedPlayer}. Null
-     * in singleplayer or on a connect that cached no icon, so no icon file is written.
-     */
     private volatile byte @Nullable [] reportIconBytes;
 
-    /**
-     * The completion inputs frozen at end-of-capture, handed to the writer thread to write the completion marker.
-     * Volatile because the writer-thread finalizer reads it; the writer's queue already establishes the happens-before,
-     * the keyword documents it (the {@link #capturedPlayer} discipline).
-     */
     private volatile @Nullable PendingReport pendingReport;
 
     /**
@@ -839,10 +467,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * the session owns its own finalization. It must be idempotent against the tick polls that follow, and it must
      * tolerate running synchronously on the caller's stack, since a {@link #finish()} with nothing to write runs it
      * inline from inside {@link CaptureController#stop()}.
-     *
-     * <p>{@code cameraDetachedAtStart} is the camera-versus-player state at the instant capture begins, the starting
-     * edge the send-range sampler needs. It arrives as a value rather than being read here so that constructing a
-     * session touches no client singleton at all.
      */
     public LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config, WorldClient level,
             DownloadTarget target, SavedChunkIndex overlayIndex, CoveredChunkIndex coveredIndex,
@@ -854,14 +478,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 overlayActive, cameraDetachedAtStart, bobbyFilter, saveCompletePoke);
     }
 
-    /**
-     * The construction a headless test can drive: the values the session takes from its {@link WorldClient} arrive
-     * directly, so {@code level} may be null and dereferencing it then fails loudly (see {@link #level()}).
-     * Package-private because a null level is a test-only state; production always builds through the public
-     * constructor, which derives the same values from the level it binds. {@code liveDimension} is the server's own key
-     * for that level, which the vanilla-mapped {@code targetDimension} equals in every vanilla world and differs from
-     * on a server that names its worlds itself.
-     */
     LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config,
             @Nullable WorldClient level, DimensionType targetDimension, DimensionType liveDimension,
             DownloadTarget target, SavedChunkIndex overlayIndex,
@@ -883,9 +499,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.liveDimensionId = liveDimension.getName();
         registerDimensionScopedStores();
         dimensionRebind.bind(targetDimension);
-        // The packet accumulator is the authoritative source for every non-player entity; publish it
-        // as the active capture so the connection-scoped inbound tee feeds it. Created only when entity capture is
-        // on, so the tee no-ops otherwise and the accumulator never grows outside a capture.
         SendRangeSampler sampler = new SendRangeSampler(System::nanoTime, cameraDetachedAtStart);
         this.packetCapture = config.captureEntities()
                 ? new EntityPacketCapture(config.dumpReceivedFrames(), sendRange, sampler, liveDimensionId)
@@ -908,11 +521,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.containerCapture = new ContainerCapture(adapter, bridge, openClickTracker);
     }
 
-    /**
-     * The bound level. Never throws in production, where every session carries one; on a level-free session it turns
-     * the first capture dereference into a loud failure instead of letting the tick rebind the session to whatever
-     * dimension the client happens to be in.
-     */
     private WorldClient level() {
         WorldClient bound = this.level;
         if (bound == null) {
@@ -921,53 +529,34 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return bound;
     }
 
-    /** The captured-position set for {@code dimension}, created empty on first use (the per-dimension dedup). */
     private LongOpenHashSet capturedFor(DimensionType dimension) {
         return capturedByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
-    /** The placement-replaced position set for {@code dimension}, created empty on first use. */
     private LongOpenHashSet replacedBlockKeysFor(DimensionType dimension) {
         return replacedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
-    /** The outline captured-block set for {@code dimension}, created empty on first use (the per-dimension dedup). */
     private LongOpenHashSet capturedBlockKeysFor(DimensionType dimension) {
         return capturedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
-    /** The outline bookshelf captured-slot masks for {@code dimension}, created empty on first use. */
     private Long2IntOpenHashMap bookshelfSlotsFor(DimensionType dimension) {
         return bookshelfSlotsByDimension.computeIfAbsent(dimension, key -> new Long2IntOpenHashMap());
     }
 
-    /** The captured block-entity type ids for {@code dimension}, created empty on first use (the staleness gate). */
     private Long2ObjectMap<String> capturedBlockTypesFor(DimensionType dimension) {
         return capturedBlockTypesByDimension.computeIfAbsent(dimension, key -> new Long2ObjectOpenHashMap<>());
     }
 
-    /**
-     * Whether an interaction predicted in {@code chunk} can still reach disk (the interaction recognizer's gate): the
-     * chunk is buffered now, has not been captured yet so its first capture is still coming, or is a revisit this mode
-     * re-buffers. False for a chunk already written and frozen, where the reconcile gate has no post-interaction
-     * block-state to read and no flush ever drains the candidate. Recording one there clears the outline's rim and
-     * counts a container for content that cannot be written, which tells the player the opposite of the truth; refusing
-     * it leaves the rim armed, which is what a re-visit needs to see.
-     */
     private boolean isInteractionChunkCapturable(ChunkPos chunk) {
         return captured.containsKey(chunk) || !allCaptured.contains(ChunkPos.asLong(chunk.chunkXPos, chunk.chunkZPos))
                 || config.recaptureChunks().overwritesRevisitedChunks();
     }
 
     /**
-     * Count and name every interaction prediction left unwritten, draining the recognizer's stashes: content the player
-     * put in the world that no chunk flush ever reached. Runs at the dimension rebind and at finish, the two
-     * whole-buffer drains, so what it sees is only what nothing else could rescue. Reported per position because the
-     * aggregate gives no way to learn which shelf or hive is short.
-     *
-     * <p>At the rebind the drain is mandatory rather than merely honest: an old-dimension candidate's position must not
-     * carry into the new dimension's shared {@link ChunkPos} space, where a same-type block could take wrong-dimension
-     * content.
+     * At the rebind the drain is mandatory: an old-dimension candidate's position must not carry into the new
+     * dimension's shared {@link ChunkPos} space, where a same-type block could take wrong-dimension content.
      */
     private void countDroppedInteractionCaptures() {
         InteractionCapture capture = this.interactionCapture;
@@ -980,21 +569,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         interactionCapturesLost += dropped.size();
         LOGGER.warn("{} predicted interactions were never written: their chunk was not captured again before the "
-                + "download moved on, so the book, disc or placed container the player put there is missing from "
-                + "the save", dropped.size());
+                + "download moved on, so the disc the player put there is missing from the save", dropped.size());
         for (BlockPos pos : dropped) {
             LOGGER.info("predicted interaction at {} was dropped; its content is missing from the save", pos);
         }
     }
 
-    /**
-     * Record an optimistically-captured bookshelf slot (the interaction recognizer's callback): OR the slot into the
-     * outline's per-dimension mask and, when this insert completes every occupied slot, count the bookshelf as one
-     * downloaded container, deduped by pos so re-cycling the same shelf does not double-count. The clicked slot is
-     * empty pre-click, so the full occupancy is the pre-insert mask plus this slot; a bookshelf still missing a slot is
-     * not counted, and {@link #tallyInteractionPositions} skips it at flush so a partly-cycled shelf never counts there
-     * either.
-     */
     private void onBookshelfSlotCaptured(long posKey, int slot, int occupiedBeforeInsert) {
         int capturedMask = bookshelfSlots.get(posKey) | (1 << slot);
         bookshelfSlots.put(posKey, capturedMask);
@@ -1004,51 +584,30 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Record an optimistically-captured placed container (the interaction recognizer's callback): mark its pos captured
-     * this session so the outline clears its rim the moment it is placed, the way {@link #onBookshelfSlotCaptured}
-     * marks a bookshelf slot and the open-time stash marks a chest on open, and record its block-entity type so Gate 2
-     * re-rims the position if a different container later replaces it (the same pairing the open-time stashes make
-     * through {@link #recordBlockType}). The flush reconcile still decides whether the contents reach disk; a placement
-     * that loses its cell to a later block is no longer loaded to rim, so the optimistic mark cannot mis-clear a live
-     * container.
-     */
     private void onPlacedContainerCaptured(long posKey, String blockTypeId) {
         capturedBlockKeys.add(posKey);
         capturedBlockTypes.put(posKey, blockTypeId);
     }
 
     /**
-     * Drop everything this session captured for a cell a placement is landing in (the interaction recognizer's
-     * callback): the block those holders were lifted from is being replaced, and a replacement of the same block-entity
-     * type leaves both the position key and the merge-time type gate matching, so no downstream guard can tell the
-     * stale contents from the new block's. Removing the holder rather than out-ranking it at merge time is what also
-     * covers the residual sweep, which folds a still-stashed holder straight onto the on-disk chunk without consulting
-     * any place-time prediction. The outline sets go with it, so a rim cleared by the old block's capture does not keep
-     * claiming the new one is downloaded.
+     * A replacement of the same block-entity type leaves both the position key and the merge-time type gate matching,
+     * so no downstream guard can tell the stale contents from the new block's. The outline sets go with it, so a rim
+     * cleared by the old block's capture does not keep claiming the new one is downloaded.
      */
     private void onBlockPlacedAt(long posKey) {
         BlockPos pos = BlockPos.fromLong(posKey);
         containerStash.remove(pos);
         lecternStash.remove(pos);
         unmarkCaptured(posKey);
-        // The sixth store this staleness reaches is on disk, where the carry-forward matches position and type
-        // and so cannot tell a same-type replacement from the block it replaced.
         replacedBlockKeys.add(posKey);
     }
 
-    /**
-     * Un-mark a position the outline was told carries downloaded contents, for a placement that gives those contents
-     * up. Membership tracks contents-stashed-for-save, so a rim left clear over a container nothing will write tells
-     * the player the opposite of the truth.
-     */
     private void unmarkCaptured(long posKey) {
         capturedBlockKeys.remove(posKey);
         capturedBlockTypes.remove(posKey);
         bookshelfSlots.remove(posKey);
     }
 
-    /** Total captured chunks across every dimension followed this session (the live and headline count). */
     private int totalCapturedChunks() {
         int total = 0;
         for (LongOpenHashSet positions : capturedByDimension.values()) {
@@ -1057,12 +616,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return total;
     }
 
-    /** Whether this tick's encode budget still has time left; gates each chunk/entity encode. */
     private boolean hasEncodeBudget() {
         return System.nanoTime() < encodeDeadlineNanos;
     }
 
-    /** The nearest-first capture offsets for {@code radius}, rebuilt only when the render distance changes. */
     private int[] ringOffsets(int radius) {
         int[] cached = ringOffsetsCache;
         if (cached == null || ringOffsetsRadius != radius) {
@@ -1074,34 +631,22 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The entity the capture window, the keep-hot window, the coverage disc, and the edit zone all center on, and the
-     * source of the saved world's spawn.
-     *
-     * <p>The camera entity is what the server centers chunk streaming on: it snaps its own player onto the camera each
+     * The camera entity is what the server centers chunk streaming on: it snaps its own player onto the camera each
      * tick and re-centers tracking there, while sending the owning client no position, so the client's own player
-     * parks. In ordinary play this returns that same player, so nothing moves.
+     * parks.
      *
-     * <p>A removed camera entity is deliberately kept rather than replaced by the player. The client never clears it,
-     * and the region the client retains has not moved either, so holding its last position is correct; falling back to
-     * the player would reintroduce the defect for the length of the gap.
-     *
-     * <p>Client main thread only: it reads live MC state. It must never be reached from an overlay read path, which
-     * runs on a background pool.
+     * <p>A removed camera entity is deliberately kept rather than replaced by the player. The client never clears it;
+     * falling back to the player would reintroduce the defect for the length of the gap.
      */
     private Entity anchorEntity(Minecraft minecraft, EntityPlayerSP player) {
         Entity camera = minecraft.getRenderViewEntity();
-        // The level guard is mod-compatibility armor, not a live case: vanilla resolves the camera entity in
-        // the current level and nulls it on a level swap.
         return camera != null && camera.world == this.level() ? camera : player;
     }
 
     /**
-     * The finish-snapshot position anchor: a seated player anchors to its root vehicle's block (a standing-height
-     * coordinate over the vehicle's own captured resting floor or water), a standing player to the ordinary camera
-     * anchor. Keyed on {@code isPassenger()}, never on whether a RootVehicle was written, so a vehicle carrying more
-     * than one player or a save-refused mount still gets the safe vehicle-block Pos instead of the floored
-     * passenger-offset seat coordinate. Pure and package-private so the seated-versus-standing choice is
-     * headless-testable; {@link #anchorEntity} stays the live-only camera resolver.
+     * Keyed on {@code isRiding()}, never on whether a {@code RootVehicle} was written, so a vehicle carrying more than
+     * one player or a save-refused mount still gets the safe vehicle-block Pos instead of the floored passenger-offset
+     * seat coordinate.
      */
     static Entity captureAnchor(Entity player, Entity cameraAnchor) {
         return player.isRiding() ? player.getLowestRidingEntity() : cameraAnchor;
@@ -1113,15 +658,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
         EntityPlayerSP player = minecraft.player;
         WorldClient current = minecraft.world;
         if (player != null && current != null && current != level()) {
-            rebindDimension(current); // follow the player across a portal; capture resumes below
+            rebindDimension(current);
         }
         if (player != null && lastPlayer.get() != player) {
             lastPlayer = new WeakReference<>(player);
             if (openClickTracker != null) {
-                // A respawn builds a fresh EntityPlayerSP even when the dimension is unchanged, and copies the
-                // old entity id onto it, so object identity is the only signal that one happened. Without
-                // this, dying with a latched click on a barrel and opening a same-size container at the
-                // respawn point inside the window writes it onto the death-site barrel's pos.
+                // A respawn builds a fresh EntityPlayerSP even when the dimension is unchanged, and copies the old
+                // entity id onto it, so object identity is the only signal that one happened. Without this, dying with
+                // a latched click and opening a same-size container at the respawn point inside the window writes it
+                // onto the death-site pos.
                 openClickTracker.reset();
             }
         }
@@ -1149,15 +694,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 SendRangeSampler sampler = capture.sampler();
                 int sweepGeneration = sampler.sweepBeginGeneration();
                 if (sweepGeneration != 0) {
-                    // The start-window (and every re-arm's) one-shot seed sweep: window-suppressed primes
-                    // registered without sampling; replay the book against the current player position.
-                    // Ids gone from the live level are Respawn-race orphans and never sample.
                     String dimensionId = level().provider.getDimensionType().getName();
                     int boundBlocks = capChunks * 16;
                     boolean aborted = false;
                     for (int id : sampler.sweepIds()) {
                         if (sampler.suppressed()) {
-                            aborted = true; // a mid-sweep re-arm defers the rest; the generation stays owed
+                            aborted = true;
                             break;
                         }
                         if (level().getEntityByID(id) == null) {
@@ -1173,25 +715,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     }
                 }
             }
-            // One shared per-tick budget (bounds the first-tick render-distance burst and the
-            // fast-fly-over: chunk capture plus the on-main entity encode), but the entity pass takes a reserved
-            // half FIRST: the per-tick pass is the only place an entity is savable: once removed it is
-            // RemovalReason.DISCARDED, which vanilla's save path refuses, so an unloaded entity cannot be caught
-            // later, and a missed one is lost, whereas terrain re-captures while still loaded and spills
-            // harmlessly across ticks. The reserve gives entities a floor a heavy new-terrain tick (fast flight
-            // into fresh chunks) cannot starve; a sparse tick returns at once, so
-            // the unused reserve flows to the absolute terrain deadline below. Running before terrain costs only
-            // one tick of latency for an entity in a chunk first-captured this tick (the privacy gate keys on
-            // allCaptured, which persists).
             long budgetNanos = config.encodeBudgetMillis() * 1_000_000L;
             long tickStartNanos = System.nanoTime();
             if (config.captureEntities()) {
                 encodeDeadlineNanos = tickStartNanos + budgetNanos / 2;
-                // Packet path: reconstruct and buffer every non-player entity whose chunk has left the keep-hot
-                // window, so the flush pump below writes it this tick. Held in the accumulator until then, so a
-                // budget spill defers it safely (unlike a poll, the entity cannot unload out from under the
-                // deferral). Entities already loaded before the download began are back-filled once by the prime
-                // poll in captureLoadedChunks.
                 int keepHot = capChunks + KEEP_HOT_MARGIN;
                 promotePacketEntities(PromotePass.KEEP_HOT, hotCenter.chunkXPos, hotCenter.chunkZPos, keepHot);
             }
@@ -1204,9 +731,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 captureOpenContainer(minecraft, player);
                 compactClosedStashHolders();
             }
-            // Warm + refresh the async stats counter on one guarded modulo path. captureTicks starts at 0
-            // so this fires on the first guarded tick (warm-up) and every STATS_REFRESH_PERIOD_TICKS after; the
-            // counter carries across portals on the same connection. Plain vanilla client API (no mixin).
             if (config.captureStatistics() && captureTicks % STATS_REFRESH_PERIOD_TICKS == 0) {
                 NetHandlerPlayClient connection = minecraft.getConnection();
                 if (connection != null) {
@@ -1221,29 +745,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
             captureTicks++;
         }
-        // The flush pump runs regardless of the guard above: when capture pauses (the
-        // player is gone or in another dimension) the bounded buffer must keep draining to disk instead of
-        // accumulating until finish(), or the memory bound is defeated exactly in the roam-then-leave case.
         pumpFlush(hotCenter);
     }
 
     /**
-     * Record this tick's entity-coverage disc for the two-tone overlay: every chunk within the measured send range (in
-     * chunks, Euclidean, chunk center) of the player's path is marked covered, so a saved chunk outside every swept
-     * disc is entity-suspect. The radius (the estimator's single per-dimension running max over the three sampler-gated
-     * feeds, clamped to the live render distance) is re-read every tick, ahead of the same-chunk early return, so a
-     * change (the max growing on a new sample, or the clamp dropping with the view distance) triggers one recompute
-     * over the whole trail even while the player stands still; the per-center caps recorded with the trail keep that
-     * retroactive paint honest. The trail append and the disc add stay gated on the player crossing into a new chunk.
-     * Keyed by the live client dimension id so it lines up with the saved record-site and the overlay providers' query.
-     * While the range is still uncalibrated the radius is 0 (only the center chunk), which the overlay's cold-start
-     * read hides by mirroring the saved set until the range is measured.
+     * The radius is re-read every tick, ahead of the same-chunk early return, so a change triggers one recompute over
+     * the whole trail even while the player stands still.
      */
     private void recordCoveredDisc(ChunkPos hotCenter, int capChunks) {
         String dimensionId = level().provider.getDimensionType().getName();
         int radius = sendRange.radiusChunks(dimensionId, capChunks);
         if (radius != lastCoveredRadius) {
-            coveredIndex.recompute(dimensionId, radius); // the range changed: rebuild covered over the whole trail
+            coveredIndex.recompute(dimensionId, radius);
             lastCoveredRadius = radius;
         }
         if (lastCoveredCenter != null && lastCoveredCenter.equals(hotCenter)) {
@@ -1254,12 +767,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         lastCoveredCenter = hotCenter;
     }
 
-    /**
-     * Enroll every store whose contents belong to one dimension with {@link #dimensionRebind}, which then owns both
-     * what a dimension change does to each and the order it does it in. A store enrolled here is one whose keys are
-     * dimension-local, so the same key names a different thing in the next dimension; the stashes keyed by entity UUID
-     * are globally unique and deliberately absent.
-     */
     private void registerDimensionScopedStores() {
         dimensionRebind.registerDrain(this::writeOutDimensionBeingLeft);
         dimensionRebind.registerDrain(this::countDroppedInteractionCaptures);
@@ -1269,16 +776,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         dimensionRebind.registerSwap(dimension -> this.bookshelfSlots = bookshelfSlotsFor(dimension));
         dimensionRebind.registerSwap(dimension -> this.capturedBlockTypes = capturedBlockTypesFor(dimension));
         dimensionRebind.registerClear(capturedThisTick::clear);
-        // Stale old-dimension positions; the new dimension refills the queue from its own buffer and re-scans
-        // its own on-disk priors for recovered coverage.
         dimensionRebind.registerClear(floorQueue::clear);
         dimensionRebind.registerClear(recoveryScanned::clear);
         dimensionRebind.registerClear(() -> {
-            lastCoveredCenter = null; // the first tick in the new dimension seeds its disc under its own key
-            lastCoveredRadius = 0; // the covered set is per dimension, so it recomputes from its own trail
+            lastCoveredCenter = null;
+            lastCoveredRadius = 0;
         });
-        // The cross-dimension jump is not a spurious fast tick; the Respawn already armed the suppression
-        // window in-stream.
         dimensionRebind.registerClear(() -> tickBaselineValid = false);
         dimensionRebind.registerClear(() -> {
             if (openClickTracker != null) {
@@ -1291,8 +794,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Follow the player into a new dimension: hand every dimension-scoped store to {@link #dimensionRebind}, whose
      * drains land the old dimension's held entities, buffers and stashes in its own folder before its swaps retarget to
      * the new one. The bound level, writer target and live dimension key advance after that call, since the drains
-     * write through them and must reach the dimension being left. The open menu closes on a dimension change, so the
-     * menu-bound stashes reset on the next tick. Capture resumes this same tick in the new dimension.
+     * write through them and must reach the dimension being left.
      */
     private void rebindDimension(WorldClient newLevel) {
         rebindDimension(VanillaDimensions.forType(newLevel.provider.getDimensionType()),
@@ -1300,10 +802,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.level = newLevel;
     }
 
-    /**
-     * The rebind a headless test can drive: the keys the session takes from its {@link WorldClient} arrive directly,
-     * and the bound level stays the caller's to advance.
-     */
     void rebindDimension(DimensionType newTarget, DimensionType liveDimension) {
         dimensionRebind.rebind(newTarget);
         this.targetDimension = newTarget;
@@ -1311,14 +809,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Write out the dimension being left: promote everything the accumulator still holds for it into the entity buffer,
-     * then flush the whole buffer, which submits both under the writer target that still names it.
-     *
-     * <p>Both halves need the writer, and the promote needs it as much as the flush does: with no writer the flush is a
+     * Both halves need the writer, and the promote needs it as much as the flush does: with no writer the flush is a
      * no-op, and a promote ahead of one would move the leaving dimension's entities into a buffer the next flush writes
-     * under the entered dimension, which is the misfiling this whole path exists to prevent. Nothing is opened on
-     * demand here, since a rebind before the first flush pump means the world could not be opened at all; what stays
-     * held is then held for a dimension the session leaves behind, and the finish counts it.
+     * under the entered dimension, which is the misfiling this whole path exists to prevent.
      */
     private void writeOutDimensionBeingLeft() {
         AsyncSaveWriter activeWriter = this.writer;
@@ -1330,19 +823,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Promote everything the packet accumulator still holds for the dimension being left, so it reaches that
-     * dimension's entity storage through the buffer flush that follows.
+     * Distance-blind and unbudgeted, because no later pass reaches the dimension being left (each promotes only the
+     * bound dimension), so anything deferred here stays held until a return trip and is lost at finish if none comes.
      *
-     * <p>Distance-blind and unbudgeted, because unlike the per-tick promote there is no later tick that can finish the
-     * work: the next one reconstructs against another world and submits under another folder, so anything deferred here
-     * is misfiled rather than delayed. The cost is one unbounded promote on the tick a player changes dimension, over
-     * at most the entities inside the keep-hot window, on a tick that already flushes the whole buffer. What the
-     * privacy gate refuses is still held rather than dropped, since this dimension's captured positions come back with
-     * the player on a return trip, and the finish counts what no return trip reclaimed against those same positions.
-     *
-     * <p>Fail-soft for the same reason the finish drain is: a reconstruct that throws must not abort the rest of the
-     * rebind and leave the session half-bound. What a throw leaves held is then held for a dimension the session is no
-     * longer bound to, which the finish counts rather than silently drops.
+     * <p>Fail-soft: a throw out of the promote must not abort the rest of the rebind and leave the session half-bound.
      */
     private void promoteHeldEntitiesLeavingDimension() {
         try {
@@ -1353,17 +837,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * The live FULL chunk at {@code pos}, or null if none is loaded or it is a Bobby cached chunk. Bobby swaps a cached
-     * {@code FakeChunk} into the {@code ChunkProviderClient} slot the server left empty, and it passes the
-     * {@code getLevel()} canary, so it must be excluded here; treating it as null routes it through the existing
-     * "server never sent it" skip.
-     */
     private @Nullable Chunk liveChunkAt(ChunkProviderClient chunkSource, ChunkPos pos) {
-        // This band's client chunk source has no status-taking getChunk; getLoadedChunk returns the live loaded
-        // chunk or null. A 1.10.2 client chunk is always full (there is no ProtoChunk or ChunkStatus concept before
-        // 1.13), so no status promotion is needed: the saved chunk's TerrainPopulated and LightPopulated flags carry
-        // the completeness the higher bands' Status string does.
         Chunk chunk = chunkSource.getLoadedChunk(pos.chunkXPos, pos.chunkZPos);
         if (chunk == null || bobbyFilter.isBobbyChunk(chunk)) {
             return null;
@@ -1374,45 +848,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void captureLoadedChunks(Minecraft minecraft, EntityPlayerSP player, ChunkPos anchor) {
         captureSquareAround(minecraft, player, anchor);
         ChunkPos playerChunk = new ChunkPos(new BlockPos(player));
-        // One square is retained by ChunkProviderClient at a time, so once the camera is more than
-        // renderDistance + 3 chunks away the player square lies outside it and this pass returns null
-        // everywhere, costing only the probes. While the two squares still overlap during the handoff it
-        // captures at most a thin trailing ring, already covered by the superset guarantee that keeps this
-        // change unable to see less than the old behavior did. Skipped entirely whenever the camera is the
-        // player, which is every tick of ordinary play.
         if (!playerChunk.equals(anchor)) {
             captureSquareAround(minecraft, player, playerChunk);
         }
     }
 
-    /**
-     * Snapshot each loaded chunk in the render-distance square: a chunk not captured this session is a first capture,
-     * and a chunk captured earlier and since flushed from the keep-hot buffer is re-buffered on revisit when the mode
-     * overwrites revisited areas, so its terrain re-flushes current the next time it leaves the keep-hot window. A
-     * still-hot chunk is left to the hot re-capture path.
-     */
     private void captureSquareAround(Minecraft minecraft, EntityPlayerSP player, ChunkPos center) {
         int radius = minecraft.gameSettings.renderDistanceChunks;
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(radius);
         ChunkProviderClient chunkSource = level().getChunkProvider();
         ChunkCodec codec = adapter.chunkCodec();
 
-        // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
-        // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
-        // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
+        // The live client dimension id, which is what the overlay providers query the overlay under, so the overlay
+        // index keys by this rather than the vanilla-mapped disk key.
         String overlayDimension = level().provider.getDimensionType().getName();
 
-        // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
-        // the visible area fills first and the lag never concentrates on one side.
         RecaptureMode recaptureMode = config.recaptureChunks();
         int[] offsets = ringOffsets(radius);
         for (int i = 0; i < offsets.length; i += 2) {
             ChunkPos pos = new ChunkPos(center.chunkXPos + offsets[i], center.chunkZPos + offsets[i + 1]);
             long posKey = ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos);
-            // The cheap in-memory checks come before getChunk, so a stationary player in a captured area never
-            // pays a per-tick getChunk: a still-hot chunk is left to the hot re-capture path, and a chunk captured
-            // earlier and since flushed is re-buffered only on revisit, and only when the mode overwrites
-            // revisited areas.
             if (captured.containsKey(pos)) {
                 continue;
             }
@@ -1422,13 +877,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
             Chunk chunk = liveChunkAt(chunkSource, pos);
             if (chunk == null) {
-                continue; // not a loaded chunk at this position (or an unloaded keep-hot margin chunk)
+                continue;
             }
             if (!hasEncodeBudget()) {
-                break; // out of budget: the rest of the square (still uncaptured) spills to a later tick
+                break;
             }
-            // Safety canary: capture only ever touches Minecraft.level (WorldClient) chunks, which are never
-            // persisted, so arming their save state cannot silently suppress a real singleplayer save.
             assert chunk.getWorld() == level : "capture touched a chunk outside the bound WorldClient";
             // The snapshot stands alone in its own try because it is the only statement here whose failure
             // loses the chunk: past the buffer insert the terrain is already committed to flush, so a throw
@@ -1445,7 +898,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
             allCaptured.add(posKey);
             try {
                 overlayIndex.add(overlayDimension, posKey);
-                // back-fill entities loaded before their AddEntity could be teed
                 captureLoadedEntities(pos, player, plausibleMaxBlocks, overlayDimension);
                 if (recaptureMode.refreshesHotChunks()) {
                     attachRecapture(chunk, pos);
@@ -1466,12 +918,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * position, since it enters neither the keep-hot buffer nor the captured set, so the square retries it every tick
      * it stays loaded and in range and an undeduped tally would inflate without bound. The dedup is held per dimension
      * because the position space is dimension-local.
-     *
-     * <p>A count is never retracted, so a position whose snapshot threw once and succeeded on a later tick still reads
-     * as one loss and reports the download partial. That is the safe direction on a path a healthy capture never takes
-     * at all, and retracting would put a second set read on every first capture.
-     *
-     * <p>Package-private so the tally it feeds stays testable.
      */
     void recordChunkCaptureLoss(ChunkPos pos, Throwable cause) {
         LongOpenHashSet counted = captureFailedByDimension.computeIfAbsent(targetDimension,
@@ -1483,62 +929,45 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Prime the entities of a freshly-captured loaded chunk, the entity analog of {@link #captureLoadedChunks}: encode
-     * each non-player entity the packet accumulator does not already track, so an entity that was already in range when
-     * the download started (its one-shot AddEntity fired before the inbound tee was feeding a capture) is still
-     * written. The packet path owns everything that streams in or reloads afterward (tracked, and held independent of
-     * unload), so this only back-fills the pre-existing set: it skips tracked and already-buffered entities, and skips
-     * an entity straddling the border unless this is its home chunk. The live entity is encoded directly (it is loaded,
-     * so no reconstruction is needed); its post-prime movement is not packet-tracked, so a pre-existing mob that then
-     * wanders is saved at its prime-time position. The captured-chunk privacy gate holds by construction: this runs
-     * only for a chunk just added to allCaptured.
+     * The captured-chunk privacy gate holds by construction: this runs only for a chunk just added to
+     * {@code allCaptured}.
      */
     private void captureLoadedEntities(ChunkPos pos, EntityPlayerSP player, int plausibleMaxBlocks,
             String overlayDimensionId) {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
-            return; // entity capture is off
+            return;
         }
-        // An entity resting on the topmost placeable block has its box bottom exactly where a build-height bound
-        // stops, and the intersection test is strict, so such a bound misses it. Y carries nothing here anyway: the
-        // result is narrowed to the chunk's own column below, and vanilla keys a saved entity by that column alone.
+        // An entity resting on the topmost placeable block has its box bottom exactly where a build-height bound stops,
+        // and the intersection test is strict, so such a bound misses it. The result is narrowed to the chunk's own
+        // column below, and vanilla keys a saved entity by that column alone.
         AxisAlignedBB bounds = new AxisAlignedBB(pos.getXStart(), -2048, pos.getZStart(),
                 pos.getXEnd() + 1, 2048, pos.getZEnd() + 1);
-        // This band has no two-argument getEntitiesOfClass; the three-argument form takes a predicate, and an
-        // all-pass predicate reproduces the every-entity-in-bounds seed the prime loop wants.
         for (Entity entity : level().getEntitiesWithinAABB(Entity.class, bounds, candidate -> true)) {
-            // Under the default recapture config (EVERYWHERE) a revisited chunk re-primes once it leaves the
-            // hot buffer, so returning through a portal to captured terrain re-seeds; only the OFF and NEARBY
-            // modes skip revisits. The prime loop can also see client-side-only entities spawned by other
-            // mods, a mod-compat over-claim edge with no vanilla instance, accepted.
             capture.primeSeed(entity, player.posX, player.posZ, plausibleMaxBlocks, overlayDimensionId);
             if (entity instanceof EntityPlayer || capture.tracks(entity.getEntityId())
                     || !new ChunkPos(new BlockPos(entity)).equals(pos)) {
-                continue; // players are not saved as entities; a tracked entity is the packet path's; a straddling
-                         // entity is buffered only by the chunk it sits in (so it is saved exactly once)
+                continue;
             }
             UUID uuid = entity.getUniqueID();
             if (shouldSaveEntity(entity)) {
-                reportCounts.addEntity(uuid); // dedup-by-UUID; matches the packet path's count semantics
+                reportCounts.addEntity(uuid);
                 primeRefusedEntities.remove(uuid);
             } else if (!savedEntities.contains(uuid)) {
                 primeRefusedEntities.add(uuid);
             }
             if (entityBuffer.chunkOf(uuid) != null) {
-                continue; // already buffered by an earlier prime or a packet promote; dedup
+                continue;
             }
             NBTTagCompound tag = encodeSingleEntity(entity, pos, EntitySource.PRIMED);
             if (tag != null) {
                 entityBuffer.accumulate(uuid, pos, tag);
-                bufferedEntitySources.put(uuid, EntitySource.PRIMED); // counted at submit, not here
+                bufferedEntitySources.put(uuid, EntitySource.PRIMED);
                 recordSaved(uuid, entity);
             }
         }
     }
 
-    /**
-     * Record what a tag bound for disk holds: the entity itself, and every passenger its serialize nests under it.
-     */
     private void recordSaved(UUID uuid, Entity entity) {
         savedEntities.add(uuid);
         for (Entity passenger : entity.getRecursivePassengers()) {
@@ -1547,21 +976,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Re-offer at finish the entities {@link #captureLoadedEntities} was refused: the standalone write turns away a
-     * vehicle carrying exactly one player, and the player-data record that would otherwise hold it is written only
-     * while the player is still seated. Only the encode half runs, since the range sampler's seed returns early for a
-     * vehicle and so never sampled these on the way in.
-     *
-     * <p>It must run before the finish-time packet drain. That drain empties the accumulator, so
+     * It must run before the finish-time packet drain. That drain empties the accumulator, so
      * {@link EntityPacketAccumulator#tracks} then answers false for everything it just promoted, and a second write of
-     * one of those at a different chunk position is the one duplicate the entities region cannot reconcile, each chunk
-     * being merged against its own on-disk copy alone.
+     * one of those at a different chunk position is the one duplicate the region cannot reconcile, each chunk being
+     * merged against its own on-disk copy alone.
      *
-     * <p>A still-refused entity is skipped before the encode so the sink skip is not tallied twice. A recovered one
-     * leaves its earlier prime-time skip standing, so that diagnostic over-counts; it is a log figure, not an input to
-     * the download's verdict.
-     *
-     * <p>Package-private so the loss its own catch counts stays testable.
+     * <p>A still-refused entity is skipped before the encode so the sink skip is not tallied twice.
      */
     void retryRefusedPrimes() {
         EntityPacketCapture capture = this.packetCapture;
@@ -1569,8 +989,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         for (UUID uuid : primeRefusedEntities) {
-            // Per entity, matching the encode's own isolation: a modded shouldBeSaved can throw, and one that does
-            // must not cost every refusal behind it in the iteration.
+            // Per entity: a modded entity's save check can throw, and one that does must not cost every refusal behind
+            // it in the iteration.
             try {
                 Entity entity = entityByUuid(uuid);
                 if (entity == null || !shouldSaveEntity(entity) || capture.tracks(entity.getEntityId())
@@ -1580,7 +1000,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 }
                 ChunkPos pos = new ChunkPos(new BlockPos(entity));
                 if (!allCaptured.contains(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos))) {
-                    continue; // the captured-chunk privacy gate, which the prime got from the chunk it ran for
+                    continue;
                 }
                 if (entityBuffer.chunkOf(uuid) != null) {
                     continue;
@@ -1604,7 +1024,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         primeRefusedEntities.clear();
     }
 
-    /** The client entity with this uuid, or null when none is loaded. The client exposes no by-uuid lookup. */
     private @Nullable Entity entityByUuid(UUID uuid) {
         for (Entity entity : level().loadedEntityList) {
             if (entity.getUniqueID().equals(uuid)) {
@@ -1614,28 +1033,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return null;
     }
 
-    /**
-     * Re-arm a freshly captured chunk ({@link #rearmUnsaved}) so the first post-capture poll does not flag it dirty.
-     * Below the 1.21.2 unsaved-listener there is no change callback, so a real post-capture block-STATE change re-sets
-     * the flag and {@link #pollDirtyChunks} picks it up on the next tick.
-     */
     private void attachRecapture(Chunk chunk, ChunkPos pos) {
         capturedThisTick.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
         rearmUnsaved(chunk);
     }
 
-    /**
-     * Keep the chunks near the player current as they change while recording, by re-encoding their buffered tags in
-     * place. Three rungs run together: the always-fresh edit zone (the player's own nearby edits, on a coarse cadence),
-     * a bounded drain of the change-driven dirty set (low-latency block-state changes), and the always-on round-robin
-     * floor (the mandatory backstop for block-entity-data edits the change-driven rung structurally cannot see). Each
-     * only ever replaces a still-hot chunk's buffered tag: it never touches {@link #allCaptured}, never writes, and
-     * never revives a flushed chunk.
-     */
     private void recaptureHotChunks(ChunkPos anchor) {
         LongOpenHashSet dirtySet = dirty;
         if (dirtySet == null) {
-            return; // torn down (defensive: captureTick stops before this once finish() runs)
+            return;
         }
         ChunkProviderClient chunkSource = level().getChunkProvider();
         ChunkCodec codec = adapter.chunkCodec();
@@ -1650,19 +1056,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         runFloorSlice(slice, codec, chunkSource, reencodedThisTick);
     }
 
-    /**
-     * Populate the change-driven dirty set by polling {@code needsSaving(false)} across the keep-hot buffer. Below the
-     * 1.21.2 {@code setUnsavedListener} push there is no change callback, so this pull replaces it. The buffer is
-     * bounded to the keep-hot square around the player, so a full scan per tick stays cheap; it does no encoding, so it
-     * spends no encode budget. Chunks a real block-state change re-flagged since their last re-encode are added, and
-     * each re-encode re-arms the flag ({@link #rearmUnsaved}); an entity-bearing chunk also re-enters once every 600
-     * ticks, when the should-save query's entity timer expires, and the re-encode that follows re-arms the timer.
-     */
     private void pollDirtyChunks(ChunkProviderClient chunkSource, LongOpenHashSet dirtySet) {
         for (ChunkPos pos : captured.keySet()) {
             Chunk chunk = liveChunkAt(chunkSource, pos);
-            // This band's Chunk exposes no isUnsaved reader; needsSaving(false) is the should-save query, which
-            // reduces to that flag only while rearmUnsaved keeps the chunk's last-save entity timer stamped.
             if (chunk != null && chunk.needsSaving(false)) {
                 dirtySet.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
             }
@@ -1670,10 +1066,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Re-encode the edit zone around {@code center} unconditionally (not dirty-gated): a block-entity-data edit such as
-     * sign text sets no dirty signal, so the edit zone is the load-bearing catcher for the player's own nearby
-     * block-entity-data edits. Iterates the keep-hot buffer (bounded by the keep-hot square) and picks its edit-zone
-     * members; replacing a buffered value never structurally modifies the key set, so iterating it directly is safe.
+     * Replacing a buffered value never structurally modifies the key set, so iterating it directly is safe.
      */
     private void recaptureEditZone(ChunkPos center, ChunkCodec codec, ChunkProviderClient chunkSource,
             LongOpenHashSet reencodedThisTick) {
@@ -1683,13 +1076,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 continue;
             }
             if (!hasEncodeBudget()) {
-                return; // the shared per-tick encode budget is spent; finish runs it unbounded
+                return;
             }
             reencode(pos, codec, chunkSource, reencodedThisTick);
         }
     }
 
-    /** Re-encode up to {@code slice} of the change-driven dirty positions; the rest wait for later ticks. */
     private void drainDirtySlice(LongOpenHashSet dirtySet, int slice, ChunkCodec codec,
             ChunkProviderClient chunkSource, LongOpenHashSet reencodedThisTick) {
         if (slice <= 0 || dirtySet.isEmpty()) {
@@ -1703,41 +1095,28 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         for (long key : batch) {
             if (!hasEncodeBudget()) {
-                return; // the shared per-tick encode budget is spent
+                return;
             }
             reencode(new ChunkPos((int) key, (int) (key >> 32)), codec, chunkSource, reencodedThisTick);
         }
     }
 
-    /**
-     * Re-encode up to {@code slice} hot chunks blindly, advancing the round-robin cursor and refilling it from the
-     * current buffer when drained, so the whole hot set is refreshed within the configured period. Budget is per cursor
-     * step, not per encode, so a step that skips an already-handled or departed chunk still bounds the work; stale
-     * entries for flushed chunks are dropped as the cursor passes them.
-     */
     private void runFloorSlice(int slice, ChunkCodec codec, ChunkProviderClient chunkSource,
             LongOpenHashSet reencodedThisTick) {
         for (int step = 0; step < slice; step++) {
             if (!hasEncodeBudget()) {
-                return; // the shared per-tick encode budget is spent
+                return;
             }
             if (floorQueue.isEmpty()) {
                 floorQueue.addAll(captured.keySet());
                 if (floorQueue.isEmpty()) {
-                    return; // nothing buffered to refresh
+                    return;
                 }
             }
             reencode(floorQueue.remove(), codec, chunkSource, reencodedThisTick);
         }
     }
 
-    /**
-     * Replace one still-hot chunk's buffered tag with a fresh encode of its current live state, then re-arm the chunk
-     * ({@link #rearmUnsaved}) so only a fresh change re-adds it. Skips a chunk already re-encoded this tick or
-     * first-captured this tick, and a candidate that is no longer eligible (flushed, so never revived; or its live
-     * chunk has unloaded past the keep-hot margin, so the last buffered snapshot stands). A throwing capture is logged
-     * and the prior buffered snapshot is kept, isolating the failure to one chunk.
-     */
     private void reencode(ChunkPos pos, ChunkCodec codec, ChunkProviderClient chunkSource,
             LongOpenHashSet reencodedThisTick) {
         long key = ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos);
@@ -1750,10 +1129,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         if (chunk == null) {
-            return; // unreachable given shouldRecapture above; the explicit check narrows nullness
+            return;
         }
-        // Safety canary: re-capture must only ever touch Minecraft.level (WorldClient) chunks, which are never
-        // persisted, so re-arming their save state cannot silently suppress a real singleplayer save.
         assert chunk.getWorld() == level : "re-capture touched a chunk outside the bound WorldClient";
         try {
             captured.put(pos, codec.capture(chunk));
@@ -1765,11 +1142,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Re-arm a client chunk after this session serialized it: clear its unsaved flag and stamp its last-save time, so
-     * the should-save query that {@link #pollDirtyChunks} polls reduces to that flag and only a fresh block-state
-     * change flags the chunk again. Package-private so a test can drive the re-arm against a real chunk.
-     */
     static void rearmUnsaved(Chunk chunk) {
         chunk.setModified(false);
         // The stamp is load-bearing, not bookkeeping. Nothing but needsSaving reads a client chunk's last-save time,
@@ -1785,23 +1157,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Detach the re-capture change tracking at session teardown: drop the dirty set and the floor queue. Nothing is
-     * attached to a {@link WorldClient} chunk to detach, the rung being a poll this session drives rather than a
-     * callback installed on the chunk, so dropping the set is the whole teardown.
-     */
     private void detachRecapture() {
         dirty = null;
         floorQueue.clear();
     }
 
-    /**
-     * Re-encode the still-loaded chunks holding a pending interaction candidate, just before {@link #detachRecapture}
-     * drops the dirty set (the interaction staleness window). {@link #reencode} no-ops an unloaded chunk, whose
-     * snapshot is already frozen at its last-loaded authoritative state, so only the loaded ones refresh and the
-     * reconcile gate then reads a post-ack snapshot. Skips a chunk the edit-zone burst already refreshed this tick (the
-     * shared {@code reencodedThisTick}).
-     */
     private void reencodePendingInteractionChunks(ChunkProviderClient chunkSource, ChunkCodec codec,
             LongOpenHashSet reencodedThisTick) {
         InteractionCapture capture = this.interactionCapture;
@@ -1815,9 +1175,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     @Override
     public CaptureCounts counts() {
-        // Containers and entities read the dedup-correct running tally (a double chest as one, the ender chest
-        // once, each entity once by UUID), not the stash sums, which double-count a chest pair and never carry an
-        // entity figure. Chunks stay the live captured-position total: the report tally only gains chunks at
+        // Containers and entities read the running tally, not the stash sums, which double-count a chest pair and never
+        // carry an entity figure. Chunks stay the live captured-position total: the report tally only gains chunks at
         // finish, so it is empty here while recording.
         return new CaptureCounts(totalCapturedChunks(), reportCounts.containerCount(), reportCounts.entityCount());
     }
@@ -1851,55 +1210,44 @@ public final class LiveCaptureSession implements CaptureController.Session {
     @Override
     public boolean isSaveComplete() {
         if (reported) {
-            return true; // nothing captured, a setup failure, or the async result was already reported
+            return true;
         }
         if (writer == null) {
-            return false; // finish() has not started the background write yet
+            return false;
         }
         AsyncSaveWriter.SaveResult result = writer.result().getNow(null);
         if (result == null) {
-            return false; // the writer thread is still draining
+            return false;
         }
         try {
-            report(result); // on the main thread (the controller polls here), so messaging the player is safe
+            report(result);
         } finally {
-            // Latched even if report throws: the controller re-polls every tick, and an unlatched throw would
-            // re-report forever and strand the session in SAVING. Losing one message beats never leaving.
+            // Latched even if report throws: a throw on the completion poke is logged by the executor, and an unlatched
+            // session would report again on the next tick's poll.
             reported = true;
         }
         return true;
     }
 
     /**
-     * Capture an open container's contents. Container items arrive only while the player has the container open (via
-     * {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so they are stashed here and merged
-     * into their target at {@link #finish()}. Each recognition axis has its own bind leg and its own confidence test,
-     * and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block or
-     * entity (a corrupt archive) while an empty container is correct. The ender chest, the double chest, the lectern,
-     * the chested animal and the container vehicle each bind through their own leg rather than being dropped; what is
-     * dropped is an open whose target the click chain cannot account for, and any open whose slot count fails its leg's
-     * size guard.
-     *
-     * <p>The binding is decided once when the menu first appears, from the target the player clicked (see
-     * {@link ContainerCapture#resolveOpenTarget}, since the live crosshair keeps drifting until the menu freezes the
-     * camera), and the contents are re-captured every tick while it stays open: last-seen-wins absorbs the one-tick lag
-     * before the content packet populates the slots, and any edits the player makes.
+     * Each recognition axis has its own bind leg and its own confidence test, and an open that no leg claims
+     * confidently is DROPPED: mis-binding would write the wrong items onto a block or entity (a corrupt archive) while
+     * an empty container is correct.
      */
     private void captureOpenContainer(Minecraft minecraft, EntityPlayerSP player) {
         Container menu = player.openContainer;
         if (menu == null || menu == player.inventoryContainer) {
-            association.close(); // no container open (the default inventory menu is "nothing")
+            association.close();
             stashChangeTracker.reset();
             openContainerId = NO_MENU;
             return;
         }
         if (menu.windowId != openContainerId) {
-            openContainerId = menu.windowId; // a new menu just appeared; decide its binding now
+            openContainerId = menu.windowId;
             stashChangeTracker.reset(); // the new menu must stash at least once, whatever its slots hold
             // Bind to the target the open resolved to, not the live crosshair: the crosshair keeps tracking the view
             // during the click-to-open round trip (no screen is open yet, so the camera is not frozen), so a nudge
-            // while the container opens would otherwise bind the wrong block or drop the open. An open no click
-            // accounts for resolves to an empty target and binds nothing, outside spectator.
+            // while the container opens would otherwise bind the wrong block or drop the open.
             ContainerCapture.OpenTarget target = containerCapture.resolveOpenTarget(minecraft, player);
             BlockPos block = target.block();
             Entity entity = target.entity();
@@ -1910,28 +1258,24 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     : null;
             // Branch order is load-bearing: the chested-animal branch precedes the entity-vehicle branch, because
             // shouldClaimVehicleOpen reads no menu at all and so cannot tell a mount menu from a vehicle's. Only a
-            // mount menu names a chested animal (no vehicle opens one), so peeling it off first cannot starve a
-            // vehicle capture.
-            // The lectern (LecternMenu / LecternBlockEntity) is a 1.14 addition absent at this band, so its bind arm
-            // is dropped; a book-in-lectern cannot exist here to lose.
+            // mount menu names a chested animal (no vehicle opens one), so peeling it off first cannot starve a vehicle
+            // capture.
             if (menu instanceof ContainerMerchant) {
-                // EntityVillager-exclusive, so this early arm steals no non-merchant open; placed above the
-                // menu-type-blind vehicle arm so a villager opened while riding a chest vehicle is not pre-empted.
                 if (config.captureEntities()) {
                     bindOpenedMerchant(entity);
                 } else {
-                    // The trade axis rides captureEntities, so with it off bind nothing and clear any prior bind,
-                    // as the ender-chest toggle arm does, or the offers stash onto a stale container's position.
+                    // The trade axis rides captureEntities, so with it off bind nothing and clear any prior bind, as
+                    // the ender-chest toggle arm does, or the menu's slots stash onto a stale container's position.
                     association.close();
                 }
             } else if (menu instanceof ContainerChest && containerCapture.isEnderChestAt(level(), block)) {
                 if (config.savePlayerEnderChest()) {
                     bindOpenedEnderChest(menu, player, block);
                 } else {
-                    // The finish strips EnderItems under this toggle, so binding would count a container the
-                    // download never writes. Every other arm decides the binding through an association leg,
-                    // which clears it on refusal; skipping the leg would leave the prior menu's binding live
-                    // and stash these ender slots onto that container's position.
+                    // The finish strips EnderItems under this toggle, so binding would count a container the download
+                    // never writes. Every bind arm decides the binding through an association leg, which clears it on
+                    // refusal; skipping the leg would leave the prior menu's binding live and stash these ender slots
+                    // onto that container's position.
                     association.close();
                 }
             } else if (containerCapture.isDoubleChestOpen(level(), menu, block)) {
@@ -1949,20 +1293,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
         association.boundPos().ifPresent(posKey -> {
             if (association.boundKind() == ContainerAssociation.BindKind.MERCHANT
                     && menu instanceof ContainerMerchant) {
-                // The offers are disjoint from the three trade slots the change gate keys on, so re-stash every tick
-                // on its own path: a switch case behind the gate would drop a mid-open offers change and lose a whole
-                // villager whose offers packet lands a tick after the open.
+                // The offers are disjoint from the three trade slots the change gate keys on, so re-stash every tick on
+                // its own path: a switch case behind the gate would drop a mid-open offers change and lose a whole
+                // villager whose offers packet lands after the open.
                 stashMerchantOffers();
                 return;
             }
-            // The lectern page (a LecternMenu concept) does not exist at this band, so the page dimension of the
-            // change key is always the fixed 0.
             int page = 0;
-            // Nothing this band's stash serializes is taken from menu progress data, so the change gate keys on
-            // the slots alone.
             int[] data = MenuChangeTracker.NO_DATA;
             if (!stashChangeTracker.changedSince(menu.inventorySlots, page, data)) {
-                return; // unchanged since the last stash: last-seen-wins needs no re-serialize this tick
+                return;
             }
             switch (association.boundKind()) {
                 case ENDER:
@@ -1986,7 +1326,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         });
     }
 
-    /** Translate the open target (the block, the menu's slot count, the block's size) into primitives. */
     private void bindOpenedContainer(Container menu, EntityPlayerSP player, @Nullable BlockPos target) {
         boolean atBlock = false;
         long posKey = 0L;
@@ -1996,12 +1335,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
             atBlock = true;
             posKey = target.toLong();
             menuSlotCount = ContainerCapture.countBlockSlots(menu, player);
-            // The client builds the menu from its MenuType with a generic SimpleContainer (never the block's
-            // TileEntity, nor a CompoundContainer for a double chest), so identity can't tie the menu to the
-            // block. Instead bind only when the target block has its own storage container (size > 0,
-            // excludes non-container blocks and ender chests, which are not TileEntityLockable) whose
-            // size matches the menu's block-slot count; the guard drops the rest (a double chest is a 54-slot
-            // menu over a 27-slot half -> mismatch).
             if (level().getTileEntity(target) instanceof TileEntityLockable) {
                 TileEntityLockable blockContainer = (TileEntityLockable) level().getTileEntity(target);
                 blockContainerSize = blockContainer.getSizeInventory();
@@ -2012,9 +1345,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
             reportCounts.addContainer("b:" + bound.getAsLong());
             LOGGER.debug("bound open container to {}", BlockPos.fromLong(bound.getAsLong()));
         } else if (target != null) {
-            // Only a real block hit that the size guard rejected is signal (the mis-bind it avoided); a
-            // null target is a menu with nothing to bind (targetless GUI, superseded click) and is already
-            // explained by resolveOpenTarget's own logging, so it stays silent here.
             LOGGER.info("dropped open container at {}: menuSlots={}, blockContainerSize={}, chunkLoaded={}",
                     target, menuSlotCount, blockContainerSize,
                     level().getChunkProvider().getLoadedChunk(target.getX() >> 4, target.getZ() >> 4) != null);
@@ -2022,14 +1352,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Translate the ender-chest-open signals into primitives for {@link ContainerAssociation#openEnderChest}. An ender
-     * chest is a {@code ContainerChest} like a normal single chest, so the target block being an
-     * {@code TileEntityEnderChest} is the discriminator (already checked by the dispatch, so {@code blockIsEnderChest}
-     * is true at this call site; the parameter keeps the negative unit-testable). The size compared is the player's own
-     * ender inventory, because an ender chest block has no container of its own to report one. The contents still come
-     * from the menu, as on every other leg: the client's ender container is never synced, so only its size is
-     * trustworthy here. What they describe is that global ender inventory, so the stash merges into the player tag at
-     * finish rather than into a chunk block entity.
+     * The contents still come from the menu, as on every other leg: the client's ender container is never synced, so
+     * only its size is trustworthy here.
      */
     private void bindOpenedEnderChest(Container menu, EntityPlayerSP player, @Nullable BlockPos target) {
         boolean atBlock = false;
@@ -2052,16 +1376,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Translate the double-chest open signals into primitives for {@link ContainerAssociation#openDoubleChest}. The
-     * double-chest analog of {@link #bindOpenedContainer}: a large chest opens a 54-slot {@code ContainerChest} over
-     * two 27-slot halves, which the single-block path drops on the 54-vs-27 mismatch. The bind candidate is the target
-     * half plus the partner half {@link ContainerCapture#doubleChestPartner} probes for, since there is no ChestType
-     * block-state property below 1.13; the sum of the two halves' sizes is the mis-bind guard. Which target half is the
-     * RIGHT one is the only left/right line here; the core stores the two halves in menu-slot order from it. If the
-     * partner is not a loaded chest the combined size stays at one half and the sum guard drops the open (empty,
-     * correct); in practice both halves are always loaded when a double opens.
-     */
     private void bindOpenedDoubleChest(Container menu, EntityPlayerSP player, @Nullable BlockPos target) {
         boolean atBlock = false;
         boolean atRightHalf = false;
@@ -2082,32 +1396,22 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 atRightHalf = partner.getX() > target.getX() || partner.getZ() > target.getZ();
                 targetPosKey = target.toLong();
                 partnerPosKey = partner.toLong();
-                menuSlotCount = ContainerCapture.countBlockSlots(menu, player); // 54 for a real double open
-                combinedContainerSize = targetHalf.getSizeInventory(); // 27
+                menuSlotCount = ContainerCapture.countBlockSlots(menu, player);
+                combinedContainerSize = targetHalf.getSizeInventory();
                 if (level().getTileEntity(partner) instanceof TileEntityChest) {
                     TileEntityChest partnerBlockEntity = (TileEntityChest) level().getTileEntity(partner);
-                    combinedContainerSize += partnerBlockEntity.getSizeInventory(); // + 27 = 54
+                    combinedContainerSize += partnerBlockEntity.getSizeInventory();
                 }
             }
         }
         if (association.openDoubleChest(atBlock, atRightHalf, targetPosKey, partnerPosKey,
                 menuSlotCount, combinedContainerSize)) {
-            reportCounts.addContainer("d:" + targetPosKey); // a double chest is one container in the count
+            reportCounts.addContainer("d:" + targetPosKey);
             LOGGER.debug("bound double chest at {} + {}", BlockPos.fromLong(targetPosKey),
                     BlockPos.fromLong(partnerPosKey));
         }
     }
 
-    /**
-     * Translate the container-vehicle open signals into primitives for {@link ContainerAssociation#openEntityContainer}
-     * and, on a confident bind, store the entity UUID the finish merge keys on. The bind target is the target vehicle,
-     * or, when there is none, the container vehicle the player is riding (the press-E flow: a chest boat opens its menu
-     * via {@code player.getRidingEntity()}, firing no use event). The UUID is read once here (not re-read per tick):
-     * the bind key is stable, so a minecart that keeps rolling while open still captures correctly and merges into
-     * whatever chunk it ends in. A NULL target vehicle at the bind tick drops the open. A REMOVED one does not: the
-     * type test stays true for an entity already taken out of the world and the clicked reference is held strongly, so
-     * a destroyed chest minecart still binds by UUID and its stash merges onto an entity the save may not carry.
-     */
     private void bindOpenedEntityContainer(Container menu, EntityPlayerSP player, @Nullable Entity target) {
         boolean atEntity = false;
         boolean entityIsVehicle = false;
@@ -2131,13 +1435,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Translate the chested-animal open signals into primitives for {@link ContainerAssociation#openChestedAnimal} and,
-     * on a confident bind, store the entity UUID the finish merge keys on. The animal is the one the MENU names, so
-     * nothing about the crosshair or the ridden vehicle can put another animal's chest on this open. Both counts are
-     * read the same tick, so the slot-count match still drops a stale or mismatched open, and the UUID is read once
-     * here, so an animal that wanders while the menu stays open still merges into whatever chunk it ends in.
-     */
     private void bindOpenedChestedAnimal(Container menu, EntityPlayerSP player, EntityHorse animal) {
         int entityChestSize = ContainerCapture.mountChestSize(animal);
         int menuChestSlotCount = ContainerCapture.countChestSlots(menu, player);
@@ -2150,16 +1447,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Bind a freshly-opened merchant menu to the click-tracked villager, or drop it. Unlike the block and vehicle binds
-     * this is identity-only: a merchant menu's offers come from a list with no slotted container to size-match, so the
-     * confidence is the menu type (villager-exclusive) plus the villager the open resolved to. The instanceof narrowing
-     * sits inside the guard so openMerchant records the drop for a non-villager target either way; a null or
-     * non-villager target binds nothing, per the drop-on-uncertainty rule. The trade count is added at real capture in
-     * {@link #stashMerchantOffers}, not here, since the offers can land a tick after the open.
+     * The instanceof narrowing sits inside the guard so {@code openMerchant} records the drop for a non-villager target
+     * either way. The trade count is added at real capture in {@link #stashMerchantOffers}, not here, since the offers
+     * can land after the open.
      */
     private void bindOpenedMerchant(@Nullable Entity target) {
-        // This band has no AbstractVillager (a 1.14 superclass added with the wandering trader); the villager is the
-        // only merchant entity, so EntityVillager is the whole merchant test.
         if (association.openMerchant(target instanceof EntityVillager, true)
                 && target instanceof EntityVillager) {
             EntityVillager villager = (EntityVillager) target;
@@ -2168,13 +1460,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Record the captured block-entity type at {@code pos} for both staleness gates: stamp it on the drained
-     * {@code holder} as {@code wdl_block_entity_id} for the writer-thread merge gate (Gate 1) and into the
-     * per-dimension type map the outline reads for the rim gate (Gate 2). A missing block entity (the open menu's block
-     * already gone), or one whose class vanilla maps no id for, leaves the holder untyped, so both gates fall back to
-     * their pre-gate behavior.
-     */
     private void recordBlockType(BlockPos pos, NBTTagCompound holder) {
         TileEntity blockEntity = level().getTileEntity(pos);
         if (blockEntity == null) {
@@ -2187,10 +1472,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * The block-entity registry id string for {@code blockEntity}, the key the chunk tag writes as {@code "id"} and the
-     * same one a recorded capture type holds, or null for a class vanilla registers no id for.
-     */
     static @Nullable String blockEntityTypeId(TileEntity blockEntity) {
         Class<?> type = blockEntity.getClass();
         String cached = blockEntityTypeIds.get(type);
@@ -2198,8 +1479,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
             cached = probeBlockEntityTypeId(blockEntity);
             blockEntityTypeIds.put(type, cached);
             if (cached.isEmpty()) {
-                // Once per class, since the sentinel is cached: a serializer raising for a reason of its own would
-                // otherwise disable both staleness gates for that class in silence for the rest of the run.
                 LOGGER.debug("no block-entity id read for {}; both staleness gates fall back for every instance of it",
                         type.getName());
             }
@@ -2215,42 +1494,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** Record the block type, stash the drained holder by pos, and mark the block captured. */
     private void stashBlockHolder(Map<BlockPos, StashHolder> stash, BlockPos pos, NBTTagCompound holder) {
         recordBlockType(pos, holder);
         stash.put(pos, StashHolder.of(holder));
         capturedBlockKeys.add(pos.toLong());
     }
 
-    /**
-     * Serialize the bound block container's current slots (each at its container-slot index) and stash them keyed by
-     * block pos, overwriting any earlier capture for the same open menu (last-seen-wins).
-     */
     private void stashContainerItems(Container menu, EntityPlayerSP player, long posKey) {
         NBTTagCompound holder = containerCapture.captureBlockSlots(menu, player);
         if (holder != null) {
-            // The brewing stand's in-progress brew time and fuel level are not captured; the potions, ingredient
-            // and fuel item are captured as ordinary Items, and the timer resumes on load. Losing the in-progress
-            // timer is the accepted band limit.
             stashBlockHolder(containerStash, BlockPos.fromLong(posKey), holder);
         }
     }
 
-    /**
-     * Split a bound double-chest menu's 54 slots 27/27 and stash each half into the existing block
-     * {@link #containerStash} keyed by its own block pos, so the per-chunk {@link ContainerMerge#mergeChunkStash} folds
-     * each into its chest block entity unchanged (a chunk-boundary straddle works because each half is keyed by its own
-     * pos and matched within its own chunk tag). The two halves are stored in menu-slot order by the core, so
-     * {@link ContainerAssociation#boundPos} is the first/RIGHT half (menu slots 0..n/2) and
-     * {@link ContainerAssociation#boundSecondaryPos} the second/LEFT half. Last-seen-wins, like every block stash.
-     */
     private void stashDoubleChestItems(Container menu, EntityPlayerSP player) {
-        OptionalLong first = association.boundPos(); // the first/RIGHT half pos (menu slots 0..n/2)
-        OptionalLong second = association.boundSecondaryPos(); // the second/LEFT half pos (menu slots n/2..n)
+        OptionalLong first = association.boundPos();
+        OptionalLong second = association.boundSecondaryPos();
         if (!first.isPresent() || !second.isPresent()) {
-            return; // bound but a half pos is missing (defensive)
+            return;
         }
-        int half = ContainerCapture.countBlockSlots(menu, player) / 2; // 27
+        int half = ContainerCapture.countBlockSlots(menu, player) / 2;
         NBTTagCompound firstHolder = containerCapture.captureHalfSlots(menu, player, 0, half);
         NBTTagCompound secondHolder = containerCapture.captureHalfSlots(menu, player, half, 2 * half);
         if (firstHolder != null) {
@@ -2261,11 +1524,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Serialize the open ender-chest menu's 27 synthetic block slots (the client's synced ender contents) into the
-     * single {@link #enderChestStash}, last-seen-wins. Reuses the container serialize; the merge into the player tag's
-     * {@code "EnderItems"} happens at {@link #finish()}, not into a chunk.
-     */
     private void stashEnderItems(Container menu, EntityPlayerSP player) {
         NBTTagCompound holder = containerCapture.captureBlockSlots(menu, player);
         if (holder != null) {
@@ -2273,15 +1531,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Serialize the open container-vehicle menu's synthetic block slots (the client's synced vehicle contents) into the
-     * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. Reuses the container serialize; the merge
-     * into the entity's tag in the {@code entities/} region happens at {@link #finish()}.
-     */
     private void stashEntityContainerItems(Container menu, EntityPlayerSP player) {
         UUID uuid = boundEntityUuid;
         if (uuid == null) {
-            return; // bound but no uuid (defensive)
+            return;
         }
         NBTTagCompound holder = containerCapture.captureBlockSlots(menu, player);
         if (holder != null) {
@@ -2290,17 +1543,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Serialize the open chested-animal menu's chest slots (the client's synced chest contents) into the
-     * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. The chested-animal analog of
-     * {@link #stashEntityContainerItems}; it lifts the chest slots only ({@link ContainerCapture#captureChestSlots},
-     * not the saddle/body), and the merge into the animal's tag in the {@code entities/} region happens when its chunk
-     * flushes, through the same {@link EntityContainerMerge#mergeEntityStash} the container vehicles use.
-     */
     private void stashChestedAnimalItems(Container menu, EntityPlayerSP player) {
         UUID uuid = boundEntityUuid;
         if (uuid == null) {
-            return; // bound but no uuid (defensive)
+            return;
         }
         NBTTagCompound holder = containerCapture.captureChestSlots(menu, player);
         if (holder != null) {
@@ -2310,29 +1556,24 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Re-serialize the open merchant's offers (and a villager's trade experience) every tick into
-     * {@link #merchantStash} keyed by the bound villager UUID, last-seen-wins, skipping an empty offers so a re-open
-     * before the offers packet lands never wipes a captured set. Runs outside the slot-keyed change gate (see the
-     * caller). The encode is isolated per villager, the discipline every vanilla-serializer encode over client-held
-     * state needs: a sell item whose codec rejects would otherwise throw out of the client tick every tick the screen
-     * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
-     * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
+     * Re-serialize the open merchant's offers every tick into {@link #merchantStash} keyed by the bound villager UUID,
+     * last-seen-wins, skipping an empty offers so a re-open before the offers packet lands never wipes a captured set.
+     * The encode is isolated per villager: a sell item that fails to encode would otherwise throw out of the client
+     * tick every tick the screen is open. The captured-set add clears the outline rim and runs only on a successful
+     * encode, so a failed encode is never falsely reported as captured.
      */
     private void stashMerchantOffers() {
         UUID uuid = boundEntityUuid;
         if (uuid == null || merchantEncodeFailed.contains(uuid)) {
-            return; // no uuid, or this villager already threw once: do not retry every tick
+            return;
         }
-        // The open trade menu's offers live on the client-side merchant the GuiMerchant holds, not on the
-        // ContainerMerchant (whose merchant field is not public at this band), so read them off the screen. The trade
-        // experience the newer bands also serialize is a 1.14 addition, omitted here (see MerchantOfferCapture).
         GuiScreen screen = Minecraft.getMinecraft().currentScreen;
         if (!(screen instanceof GuiMerchant)) {
             return;
         }
         MerchantRecipeList offers = ((GuiMerchant) screen).getMerchant().getRecipes(Minecraft.getMinecraft().player);
         if (offers == null || offers.isEmpty()) {
-            return; // offers not synced yet, or empty: never overwrite a captured non-empty set with an empty tick
+            return;
         }
         NBTTagCompound holder;
         try {
@@ -2343,23 +1584,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         merchantStash.put(uuid, holder);
-        capturedEntityIds.add(uuid); // clears the outline rim, only on a successful encode
-        reportCounts.addContainer("m:" + uuid); // count at real capture, not at bind
+        capturedEntityIds.add(uuid);
+        reportCounts.addContainer("m:" + uuid);
     }
 
-    /**
-     * Stream the chunks that have moved out of the keep-hot window to the background writer and drop them from memory,
-     * so the buffer stays bounded as the player roams. Runs every tick (even when capture is paused). When capture is
-     * paused ({@code hotCenter} is null, player gone or in another dimension) the whole buffer is drained, since no new
-     * nearby chunks will be captured to keep it hot.
-     */
     private void pumpFlush(@Nullable ChunkPos hotCenter) {
         if (captured.isEmpty()) {
             return;
         }
         AsyncSaveWriter activeWriter = ensureWriter();
         if (activeWriter == null) {
-            return; // the world could not be opened for writing; keep buffering and report at finish()
+            return;
         }
         if (hotCenter == null) {
             flushBuffer(activeWriter, true, 0, 0, 0);
@@ -2371,8 +1606,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     @Override
     public void finish() {
-        // Minecraft is not an Executor at this band; addScheduledTask (its schedule-on-main-thread) is the executor the
-        // completion poke needs.
         completeThroughWriter(runnable -> Minecraft.getMinecraft().addScheduledTask(runnable), this::finishCapture);
     }
 
@@ -2396,38 +1629,27 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * The finish proper: the save-time re-capture burst, the capture teardown, the exits that write nothing, and the
-     * drain that hands the writer everything it still needs. Leaves the end-of-stream signal to
-     * {@link #completeThroughWriter}, which owes it whether this returns or throws.
-     *
-     */
     private void finishCapture() {
-        // Stamped here rather than at the drain, because the save-time burst below is itself a live-state read
-        // racing the same teardown: a window measured from the drain would leave it out and read low.
         long finishStartNanos = System.nanoTime();
         // The finish drain must encode everything still loaded, so the per-tick encode budget does not apply
         // here (the burst below and the entity refresh run unbounded).
         encodeDeadlineNanos = Long.MAX_VALUE;
-        // Save-time re-capture burst: refresh the player's immediate area one last time so a
-        // just-placed block or edited sign is current at save, the freshness guarantee the coarse-cadence
-        // edit zone leaves to here. Bounded to the edit zone (~9 chunks), a trivial main-thread cost. Run
-        // before detaching so it sees the live state; skipped if the player is gone (a disconnect-flushed save).
+        // Save-time re-capture burst: refresh the player's immediate area one last time so a just-placed block or
+        // edited sign is current at save, the freshness guarantee the coarse-cadence edit zone leaves to here.
         Minecraft minecraft = Minecraft.getMinecraft();
         EntityPlayerSP player = minecraft.player;
         if (config.recaptureChunks().refreshesHotChunks() && player != null && minecraft.world == level()) {
-            capturedThisTick.clear(); // finish() is its own moment: the burst refreshes the area unconditionally
+            capturedThisTick.clear();
             LongOpenHashSet reencodedThisTick = new LongOpenHashSet();
             ChunkPos anchor = new ChunkPos(new BlockPos(anchorEntity(minecraft, player)));
             recaptureEditZone(anchor, adapter.chunkCodec(), level().getChunkProvider(), reencodedThisTick);
-            // Close the interaction staleness window: re-encode any still-loaded pending-candidate chunk
-            // outside the edit zone before the dirty set is dropped, so the reconcile gate reads a post-ack
-            // snapshot rather than a stale-present one and cannot persist content the player just reverted.
+            // Re-encode any still-loaded pending-candidate chunk outside the edit zone, so the reconcile gate reads a
+            // post-ack snapshot rather than a stale-present one and cannot persist content the player just reverted.
             reencodePendingInteractionChunks(level().getChunkProvider(), adapter.chunkCodec(), reencodedThisTick);
         }
-        detachRecapture(); // teardown: release the dirty set, which is all the poll-driven rung holds
-        deactivateInteractionCapture(); // stop the use-block hook feeding this session; the drain reads the instance
-        deactivateOpenClickTracker(); // stop the use hooks seeding this session's open bind
+        detachRecapture();
+        deactivateInteractionCapture();
+        deactivateOpenClickTracker();
         if (totalCapturedChunks() == 0) {
             if (chunksCaptureFailed > 0) {
                 // This exit reports no tally, so without this a capture that threw on every chunk is
@@ -2451,16 +1673,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         drainToWriter(activeWriter, minecraft, player, finishStartNanos);
     }
 
-    /**
-     * Everything a finish that opened a world still owes the writer: the last packet-entity drain, the whole-buffer
-     * flush, the reconciliation and its loss counts, the saved player and progress snapshots, the resumed mount
-     * release, and the frozen report counts, each one submitted or published before end-of-stream. Runs inside
-     * {@link #completeThroughWriter}, whose guarantee is that the marker follows this however it ends.
-     */
-    // Package-private so the orphan loss is unit-testable: it sits in the Minecraft-coupled finish drain, which no
-    // headless test can reach. An opened vehicle re-approached after its chunk flushed drains its stash entry before
-    // this check, so whatever survives was never folded into a saved top-level entity; the user interacted with this
-    // storage and its items are absent, so surface it as a loss.
     void countOrphanedContainerVehicles() {
         if (entityContainerStash.isEmpty()) {
             return;
@@ -2470,18 +1682,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 + "written as a top-level entity we could fold them into (its terrain was never captured, it "
                 + "saved nested as a passenger, or its reconstruct or flush failed), so the items the player "
                 + "opened are lost", entityContainerStash.size());
-        // Logged directly rather than through a loss voice because no throwable exists to key a stack
-        // budget on; the aggregate count above gives no way to learn which mount saved empty.
         for (UUID vehicle : entityContainerStash.keySet()) {
             LOGGER.info("container vehicle {} saved without the contents the player opened; they are missing "
                     + "from the save", vehicle);
         }
     }
 
-    // Package-private so the orphan loss is unit-testable: it sits in the Minecraft-coupled finish drain, which no
-    // headless test can reach. mergeMerchantStash drains only villagers written as a top-level entity, so a captured
-    // villager whose node was never written survives here, and its rim was already cleared at capture, so without
-    // this it would read as captured yet write nothing.
     void countOrphanedMerchantTrades() {
         if (merchantStash.isEmpty()) {
             return;
@@ -2497,8 +1703,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    // Package-private for the reason the orphan counts above are: the loss sits in the Minecraft-coupled finish
-    // drain, which no headless test can reach.
     void countMissingPlayerRecord() {
         playerRecordsLost = 1;
         LOGGER.warn("no player record reached the save: the finish found no live player to read, so this download "
@@ -2508,9 +1712,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Count one surface of the player record that fell back to a default because the client tore that state down before
-     * the finish read it. Call it only from a read whose field stays non-null for a whole live session, so that a null
-     * there is the teardown and never an ordinary state.
+     * Call it only from a read whose field stays non-null for a whole live session, so that a null there is the
+     * teardown and never an ordinary state.
      */
     private void noteLivePlayerStateLost(String surface) {
         playerRecordsLost = 1;
@@ -2521,24 +1724,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     private void drainToWriter(AsyncSaveWriter activeWriter, Minecraft minecraft, @Nullable EntityPlayerSP player,
             long finishStartNanos) {
-        // From here every newly imaged map batches instead of streaming alone, so the writer can report the map
-        // phase over a known total. Armed before the first finish-time remap below and handed over after the last
-        // one; the local spares that handover a null check on the field.
         List<Runnable> mapWrites = new ArrayList<>();
         this.finishMapWrites = mapWrites;
-        // Filled maps are captured on-sight (the live remap table streams each one as it is first imaged): a
-        // container's maps are remapped and serialized in flushBuffer just before the holder drains, and the
-        // still-live sources are handled at finish: the inventory and ender chest in assembleCapturedPlayer, and
-        // the packet-captured item frames / dropped items / container vehicles when their tags drain.
         // Stop the inbound tee before the finish drain so no spawn arrives mid-drain to be left unwritten and
         // uncounted; the drain and the reconciliation then see a settled accumulator.
         deactivatePacketCapture();
         captureLiveClientState(minecraft, player);
         long liveStateNanos = System.nanoTime();
         retryRefusedPrimes();
-        // Drain the held packet accumulator: every non-player entity in a captured chunk, including the fly-past
-        // tail that unloaded long ago and even after a disconnect-flush, at its last
-        // known position. Fail-soft so a reconstruct throw never aborts before the level.dat finalize.
+        // Fail-soft: a throw out of the drain must not abort the rest of the finish.
         boolean drainAborted = false;
         if (config.captureEntities()) {
             try {
@@ -2548,7 +1742,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 drainAborted = true;
             }
         }
-        flushBuffer(activeWriter, true, 0, 0, 0); // drain whatever is still buffered (chunks and entities)
+        flushBuffer(activeWriter, true, 0, 0, 0);
         if (drainAborted) {
             // After the flush, not in the catch above: the void-chunk skip reads the accumulator as one of its
             // keep-this-chunk signals, so emptying it before the drain would let a chunk holding nothing but
@@ -2565,11 +1759,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         countOrphanedMerchantTrades();
         long drainDoneNanos = System.nanoTime();
         releaseResumedDismountedMount(activeWriter);
-        prepareReportCompletion(); // freeze the end-of-capture counts before the writer finalizes
-        // After every remap site above, so the batch is complete and queues behind the last chunk and entity
-        // write: the bar then finishes the chunk phase, advances through the map phase, and only then compresses.
+        prepareReportCompletion();
+        // After every remap site above, so the batch is complete and queues behind the last chunk and entity write.
         activeWriter.submitMapBatch(mapWrites);
-        this.finishMapWrites = null; // the writer holds its own copy; dropping ours frees the batched map tags
+        this.finishMapWrites = null;
         this.finishBatchClosed = true;
         // INFO because a field report of a missing player record is undiagnosable without it, and never has debug.log.
         LOGGER.info("finish: the live client state was read {} ms in, the entity drain and flush finished {} ms in",
@@ -2577,76 +1770,57 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Everything this finish must read from the live client, taken before the entity drain rather than after it.
-     *
-     * <p>Do not move any of it back behind the drain. The finish can be entered after the client has already torn its
-     * level down, because a disconnect detected on a tick edge cannot reach it until the player is gone, so every read
-     * here is void the moment the field it needs is nulled. Being early does not close that: a client already torn down
-     * when the finish is entered still loses the player record.
+     * Do not move it behind the entity drain: {@link #prepareRootVehicleCapture} fills the set the drain and the flush
+     * consult to hold the ridden mount and its passengers out of the standalone write and folds the mount's opened
+     * contents into the record; run after the flush it would leave the mount on disk twice on one UUID, and run after
+     * the drain alone it would count the mount as a written entity the flush then drops.
      */
     private void captureLiveClientState(Minecraft minecraft, @Nullable EntityPlayerSP player) {
         if (player != null && minecraft.world == level()) {
             // The mount is player-state, so this is not gated on captureEntities.
             prepareRootVehicleCapture(player);
-            // Fail-soft: a serialize or scrub throw here, after chunks have committed, must not abort before
-            // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
-            // any throw degrades to a null capturedPlayer (the openable void-world level.dat) and the save runs on.
             this.capturedPlayer = failSoft("player", () -> assembleCapturedPlayer(player, minecraft));
             this.capturedProgress = failSoft("progress", () -> assembleCapturedProgress(player, minecraft));
             UUID salvageAttach = rootVehicleAttach;
             NBTTagCompound salvageMount = rootVehicleTag;
             if (this.capturedPlayer == null && salvageMount != null && salvageAttach != null) {
-                // The full player assembly threw (the void-world fail-soft), but a seated mount was already
-                // excluded from the standalone write and its loot drained from the stash, so a bare void-world
-                // save would drop the mount and its capture-once contents from both the entities region and the
-                // player record. Salvage a minimal player carrying just the RootVehicle. Its own fail-soft: if even
-                // this throws, the void-world save stands and the mount is lost (the accepted worst case).
+                // The full player assembly threw (the void-world fail-soft), but a seated mount was already excluded
+                // from the standalone write and its loot drained from the stash, so a bare void-world save would drop
+                // the mount and its capture-once contents from both the region and the player record.
                 this.capturedPlayer = failSoft("salvaged mount",
                         () -> assembleSalvageMountPlayer(player, minecraft, salvageAttach, salvageMount));
             }
         } else {
-            // Always a loss, never a download that simply had no player: a session that captured nothing returns
-            // before the drain is entered, so anything reaching here captured chunks around a live player.
             countMissingPlayerRecord();
         }
-        // Snapshot the source server's icon on the main thread; the writer thread reads the frozen bytes. Reading
-        // at finish, not begin, also catches an icon pushed mid-session after join. Deliberately outside the guard
-        // above, so an icon can still survive a finish already too late for the player record.
+        // Deliberately outside the guard above, so an icon can still survive a finish already too late for the player
+        // record.
         ServerData iconServer = minecraft.getCurrentServerData();
         String iconB64 = iconServer != null ? iconServer.getBase64EncodedIconData() : null;
         this.reportIconBytes = iconB64 != null ? Base64.getDecoder().decode(iconB64) : null;
     }
 
     /**
-     * Run {@code finishWork} and signal end-of-stream to any writer this session opened, however that work ends. A
-     * writer exists from the first incremental flush onward, and until it takes the marker it sits blocked on its
-     * queue: no level.dat, the world's session lock held by a daemon thread that never exits, and the future the
-     * controller polls never completed, so the download neither finishes nor reports. That is worse than a reported
-     * failure, since nothing surfaces and nothing can be retried. Two ways in, which is why this wraps the whole finish
-     * rather than its tail: a throw anywhere in the work, and the nothing-captured exit, which a download whose
-     * captured positions were all dropped as void reaches with a writer already open behind it.
+     * A writer exists from the first incremental flush onward, and until it takes the marker it sits blocked on its
+     * queue: no level.dat, a daemon thread that never exits, and the future the controller polls never completed, so
+     * the download neither finishes nor reports. Two ways in, which is why this wraps the whole finish rather than its
+     * tail: a throw anywhere in the work, and the nothing-captured exit, which a download whose captured positions were
+     * all dropped as void reaches with a writer already open behind it.
      *
-     * <p>It signals the one end of stream, the finalizing one, on every path. A download that captured nothing reaches
-     * it too, and the finalize then writes level.dat over the one a resumed folder already has, in the void-world form
-     * since no player snapshot was assembled. That is deliberate and it is the better of two bad outcomes: vanilla
-     * renames the replaced file to level.dat_old rather than dropping it, and lists a folder holding either, so the
-     * record is recoverable and the folder stays openable. Skipping the finalize instead leaves a folder that wrote
-     * chunks with no level.dat at all, which vanilla's world list does not show, and leaves the map-id floor
-     * unpersisted so a new map in the reopened save can overwrite an archived one. Deciding between the two per
-     * download needs a predicate for "did this write anything", and the obvious one, whether any captured position is
-     * still retained, is not that: the void skip drops positions that were already written.
+     * <p>It signals the one end of stream, the finalizing one, on every path. Skipping the finalize instead leaves a
+     * folder that wrote chunks with no level.dat at all, which vanilla's world list does not show, and leaves the
+     * map-id floor unpersisted so a new map in the reopened save can overwrite an archived one. Deciding between the
+     * two per download needs a predicate for "did this write anything", and the obvious one, whether any captured
+     * position is still retained, is not that: the void skip drops positions that were already written.
      *
-     * <p>A throw counts as a degraded finish step, and that is what keeps the completion record from calling clean a
-     * download whose remaining finish work (the map batch, the frozen report counts, the assembled player) never
-     * reached the writer at all. Both halves are needed: the save must reach a terminal state, and a save that
-     * completes claiming a success it did not have is worse than the parked thread. A {@link Throwable} is caught
-     * rather than a {@link RuntimeException} for the reason the writer's own drain catches one, that reaching the
-     * terminal state matters more than which class of failure got in the way, and the signal is enqueued from a
-     * {@code finally} so that a throw from the counting arm itself cannot reopen the hole this closes.
+     * <p>A throw counts as a degraded finish step, so the download does not report clean although its remaining finish
+     * work (the map batch, the frozen report counts, the assembled player) never reached the writer at all. A
+     * {@link Throwable} is caught rather than a {@link RuntimeException} for the reason the writer's own drain catches
+     * one, that reaching the terminal state matters more than which class of failure got in the way, and the signal is
+     * enqueued from a {@code finally} so that a throw from the counting arm itself cannot reopen the hole this closes.
      *
      * <p>The counter is incremented before the marker is enqueued, so the writer-thread finalize reads it across the
-     * queue's own happens-before edge. Package-private and taking the work as a thunk so the guarantee is
-     * headless-testable on one session, as with {@link #failSoft}.
+     * queue's own happens-before edge.
      */
     void completeThroughWriter(Executor mainThread, Runnable finishWork) {
         @Nullable
@@ -2661,8 +1835,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         } finally {
             AsyncSaveWriter activeWriter = writer;
             if (activeWriter != null) {
-                // end-of-stream; the writer drains, finalizes, completes its future, then the marshal pokes the
-                // completion back to the game thread (off the tick, so a paused replay does not strand it).
                 CompletionMarshal.scheduleCompletionPoke(activeWriter.finish(), mainThread, saveCompletePoke);
             } else if (failure != null) {
                 // No writer means nothing was written and no lock is held, but it also means no future for the
@@ -2674,11 +1846,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Close out a {@link #finish()} that never started a background write (nothing was captured, or the world could not
-     * be opened), once the caller has surfaced its own outcome.
-     *
-     * <p>The poke runs inline on the game thread and must follow {@code reported = true}: with no writer, the reported
-     * short-circuit in {@link #isSaveComplete()} is the only completion it can observe.
+     * The poke runs inline and must follow {@code reported = true}: with no writer, the reported short-circuit in
+     * {@link #isSaveComplete()} is the only completion it can observe.
      */
     private void completeWithoutWriter() {
         reported = true;
@@ -2686,11 +1855,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         saveCompletePoke.run();
     }
 
-    /**
-     * Deactivate the packet capture so the connection-scoped inbound tee stops feeding it (a later session activates
-     * its own). Called before the finish drain so no spawn arrives mid-drain to be left unwritten and uncounted, and on
-     * the nothing-captured / save-failed paths that never drain. Idempotent.
-     */
     private void deactivatePacketCapture() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture != null) {
@@ -2698,11 +1862,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Deactivate the interaction recognizer so the connection-scoped use-block hook stops feeding it (a later session
-     * activates its own). Called once at finish-time teardown; the finish drain still reads the instance directly, so
-     * the publication can fall before the drain. Idempotent.
-     */
     private void deactivateInteractionCapture() {
         InteractionCapture capture = this.interactionCapture;
         if (capture != null) {
@@ -2710,10 +1869,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Deactivate the open-click tracker so the connection-scoped use hooks stop seeding this session's open bind (a
-     * later session activates its own). Called once at finish-time teardown. Idempotent.
-     */
     private void deactivateOpenClickTracker() {
         OpenClickTracker tracker = this.openClickTracker;
         if (tracker != null) {
@@ -2721,22 +1876,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Classify the frames an aborted finish drain left held, so the reconciliation counts them instead of folding them
-     * into the residual it reports as reload churn. A held entity whose chunk was captured is a real loss: it was
-     * received, nothing will write it now, and the finish is the last pass. One whose chunk was not captured is the
-     * ordinary privacy-gate drop a completed drain would also have made. The accumulator is drained either way, so the
-     * same frames cannot inflate that residual as well.
-     *
-     * <p>Runs after the finish flush and only when the drain aborted, both for reasons its call site states. Whatever
-     * the accumulator still holds at that point is what the abort abandoned.
-     *
-     * <p>What this cannot see is the chunk that was mid-promotion when the throw came: its frames left the accumulator
-     * before the throw, so whatever of them had not yet reached the buffer is lost outside this count, the one residue
-     * of counting an abort from the outside.
-     *
-     * <p>Package-private so the tally it feeds stays testable.
-     */
     void countAbandonedFrames() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
@@ -2754,25 +1893,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Drain and count what the accumulator still holds for a dimension other than the bound one, so the finish accounts
-     * for it instead of leaving it to inflate the residual its own line calls reload churn. The ordinary source is the
-     * tick of a dimension change: the inbound stream stamps arriving entities with the world its dimension marker last
-     * named, so entities of the world the player just entered can already be held when a stop lands before the rebind
-     * that would follow them there.
-     *
-     * <p>Settled one dimension at a time, because the question that decides the bucket is per dimension: did THAT
-     * dimension capture the terrain the entity stands on. Where the answer is no, this is the privacy gate refusing the
-     * entity exactly as it would have in its own dimension, so it is the benign drop and nothing about it is a loss the
-     * user should be told about. Where the answer is yes, or where the dimension's own position set cannot be reached
-     * at all, the entity was writable and nothing wrote it, which is the loss this counter reports.
-     *
-     * <p>Runs after the inbound tee is deactivated and before the reconciliation, which is the whole of its ordering
-     * constraint: a spawn arriving between the finish drain and that deactivation would otherwise be drained by neither
-     * sweep and counted by nothing. Unlike the abandoned-frame sweep beside it, it cannot disturb the void-chunk skip
-     * whatever its position: that skip reads the bound dimension's chunks and this drains only other dimensions'.
-     * Package-private so the tally it feeds stays testable.
-     */
     void countUnboundDimensionFrames() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
@@ -2781,7 +1901,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         int unwritable = 0;
         for (String dimensionId : capture.heldDimensions()) {
             if (dimensionId.equals(liveDimensionId)) {
-                continue; // the bound dimension is the finish drain's, and it has already run
+                continue;
             }
             LongOpenHashSet captured = capturedPositionsOf(dimensionId);
             LongIterator chunkKeys = capture.chunks(dimensionId).iterator();
@@ -2806,11 +1926,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The captured positions of the dimension a held frame names, or null when this download cannot answer for it. The
-     * stamp is the server's own level key, so it resolves for the three keys a capture lays out under and for nothing
-     * else: a server that names its worlds itself yields an id no folder of ours corresponds to, and there the privacy
-     * gate's question has no answer rather than the answer no. A dimension that resolves but was never bound captured
-     * nothing, which is an empty set rather than an absent one.
+     * The captured positions of the dimension a held frame names, or null when this download cannot answer for it. A
+     * dimension that resolves but was never bound captured nothing, which is an empty set rather than an absent one.
      */
     private @Nullable LongOpenHashSet capturedPositionsOf(String dimensionId) {
         DimensionType target = VanillaDimensions.forId(dimensionId);
@@ -2822,9 +1939,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * How many of {@code drained} nothing else saved. A mount captured into the player's RootVehicle is excluded, the
-     * same way promoteChunk excludes it, because it reaches disk inside level.dat and counting its abandoned frame
-     * would report a loss the download did not take.
+     * A mount captured into the player's {@code RootVehicle} is excluded because it reaches disk inside level.dat and
+     * counting its abandoned frame would report a loss the download did not take.
      */
     private int abandonedCount(List<? extends PacketEntity<?, ?, ?>> drained) {
         int abandoned = 0;
@@ -2836,15 +1952,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return abandoned;
     }
 
-    /**
-     * Reconcile and log the entity packet capture, after the buffer has flushed so the write tally is what reached the
-     * writer. Logs the full breakdown (written roots, nested passengers, every counted drop) plus the
-     * received-minus-accounted residual, which is reload / id-reuse churn, not a loss, so it is reported, not alarmed.
-     * The WARN fires only on a structural loss (an entity-chunk flush loss, a create failure, a throwing single encode,
-     * an aborted finish drain, or a remainder held for another dimension), near-zero in a healthy capture. The prime
-     * path is reported separately because a primed entity has no spawn packet to reconcile against. Package-private so
-     * the structural-loss tally it feeds stays testable.
-     */
     void reportEntityReconciliation() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
@@ -2878,11 +1985,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         dumpReceivedFrames(capture);
     }
 
-    /**
-     * Diagnostic only: dump the received item-frame keys to {@code <save>/wdl/received-item-frames.txt} so a missing
-     * frame can be diffed against what the client actually received. A received-but-missing frame is a capture bug; a
-     * missing frame absent from this dump was never sent by the server. Fail-soft.
-     */
     private void dumpReceivedFrames(EntityPacketCapture capture) {
         Path root = this.reportRoot;
         if (!config.dumpReceivedFrames() || root == null) {
@@ -2899,29 +2001,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Snapshot a seated player's root vehicle into {@link #rootVehicleTag} before the entity drain, mirroring
-     * {@code ServerPlayer.saveParentVehicle}. Client main thread only (it reads live entity relationships and runs
-     * {@code entity.save} over the live tree), never from a background/overlay read path. The whole fallible body is
-     * per-unit failure-isolated like {@link #encodeSingleEntity}: {@code captureRootVehicle}'s {@code entity.save}
-     * throws a {@code ReportedException} on a codec-rejecting modded or rolled-back entity, which without this catch
-     * would propagate into {@link #finish()} and abort it before the writer finalizes, hanging the writer with the
-     * session lock held. On a throw or a refused save the mount stays on the standard entity paths and the player loads
-     * without a mount; the position anchor still fires.
-     */
     private void prepareRootVehicleCapture(EntityPlayerSP player) {
         if (!player.isRiding()) {
-            return; // the common fast path; isPassenger is a field read that cannot throw
+            return;
         }
-        // Everything fallible is inside the try, including the vehicle-tree traversals: a modded Entity could
-        // override getVehicle/getRootVehicle/hasExactlyOnePlayerPassenger to throw, and any throw here must not
-        // propagate into finish() and hang the writer. A return inside the try is a normal exit (the catch does
-        // not fire).
+        // Everything fallible is inside the try, including the vehicle-tree traversals: a modded Entity could override
+        // getRidingEntity/getLowestRidingEntity/getRecursivePassengersByType to throw, and any throw here must not
+        // propagate into finish().
         try {
             Entity root = player.getLowestRidingEntity();
             Entity direct = player.getRidingEntity();
             if (direct == null || root == player || root.getRecursivePassengersByType(EntityPlayer.class).size() != 1) {
-                return; // ServerPlayer.saveParentVehicle's own condition
+                return; // vanilla's player save uses the same condition
             }
             Set<UUID> excluded = new HashSet<>();
             if (!(root instanceof EntityPlayer)) {
@@ -2946,18 +2037,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Fold the captured open-time contents into the mount record by {@code "Items"}, each node asked for the contents
-     * captured against its own {@code "UUID"}, the same scrub + map-remap + merge the standalone vehicle path applies,
-     * then scrub the record's item-borne coordinates. The live client mount serializes with empty {@code "Items"} (the
-     * menu is a throwaway container, not the entity), so this is required, not redundant. The record holds the whole
-     * tree from its root, so the entity whose menu was opened need not be that root, and while the player rides, the
-     * record is that tree's only copy on disk. Draining the stash entry keeps the finish-time "contents not saved"
-     * warning from counting it. A merge throw is isolated and tallied, the {@link EntityContainerMerge} discipline:
-     * that node then saves valid but empty. Package-private so the entity-container tally it feeds stays testable.
+     * The live client mount serializes with empty {@code "Items"} (the menu is a throwaway container, not the entity),
+     * so this is required, not redundant. The record holds the whole tree from its root, so the entity whose menu was
+     * opened need not be that root, and while the player rides, the finish writes that tree nowhere else. Draining the
+     * stash entry keeps the finish-time "contents not saved" warning from counting it.
      */
     NBTTagCompound foldRidingVehicleContents(NBTTagCompound vehicleTag) {
-        // Into a copy, because a node below the root is folded in place: the tag handed in stays exactly what
-        // the entity serialize produced, the no-mutate discipline the container sink itself keeps.
         NBTTagCompound result = vehicleTag.copy();
         // The entity write never sees this tree, dropExcludedRootVehicles having removed it, so the scrub the flush
         // applies to every other merchant has to be repeated here or a merchant riding with the player is the one
@@ -2972,31 +2057,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return result;
     }
 
-    /** Fold the open-time contents captured against {@code uuid} into that entity's own node, in place. */
     private void foldEntityContents(UUID uuid, NBTTagCompound entityTag) {
         NBTTagCompound holder = entityContainerStash.remove(uuid);
         boolean fromRetention = holder == null;
         if (holder == null) {
-            // Reboarded without reopening: the stash drained into an earlier standalone write, but the holder
-            // was retained for exactly this, so the mount is written whole instead of being skipped. Use the
-            // retained object itself and never a copy of it: the guard below is keyed on identity, and a copy
-            // would read as unprepared and re-run the non-idempotent map remap over ids that are already
-            // archive ids.
-            //
-            // This does leave the mount on disk twice, once standalone and once under RootVehicle, under the
-            // same-UUID residency rule EntityContainerMerge.refoldFlushedContainers states in full. Both copies
-            // carry the contents, so no loot rides on which one a given load keeps. A passenger that boarded
-            // after the standalone write does: it exists only in the RootVehicle copy. Still strictly better
-            // than skipping the mount, which dropped that passenger every time.
+            // Use the retained object itself and never a copy of it: the guard below is keyed on identity, and a copy
+            // would read as unprepared and re-run the non-idempotent map remap over ids that are already archive ids.
             holder = foldedContainerVehicles.get(uuid);
         }
         if (holder == null) {
             return;
         }
-        // Guard by holder identity, exactly as prepareEntityContainers does: while the player rides, a
-        // mid-session entity flush already scrubbed+remapped this same holder once, and the map remap is
-        // non-idempotent (remapping an already-archived id blanks the map). Prepare only a not-yet-prepared
-        // holder; an already-prepared one is scrubbed and remapped correctly from that one call.
+        // Guard by holder identity: while the player rides, a mid-session entity flush already scrubbed+remapped this
+        // same holder once, and the map remap is non-idempotent.
         if (preparedEntityContainers.add(holder)) {
             scrubAndRemapItems(holder, uuid);
         }
@@ -3013,13 +2086,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Assemble the immutable player finish-snapshot from the live client (main thread): serialize the player, apply the
-     * strip knobs and the unconditional strips, the opt-in item-coordinate scrub, the canonical {@code "Dimension"},
-     * and the open-time ender-chest merge, then bundle the spawn position, gamemode, and difficulty. Everything in the
-     * returned {@link CapturedPlayer} is finished, so it crosses to the writer thread safely. Throwing is the caller's
-     * fail-soft contract.
-     */
     private CapturedPlayer assembleCapturedPlayer(EntityPlayerSP player, Minecraft minecraft) {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
         NBTTagCompound raw = adapter.playerSink().capturePlayer(player);
@@ -3027,13 +2093,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         PlayerTag.stripDeathLocation(raw);
         PlayerTag.stripRespawnPoint(raw);
         if (!config.saveItemCoordinates()) {
-            // The player tag is entity-shaped, so the entity scrub covers the Inventory list and the
-            // equipment compound (offhand and armor live there, not in Inventory, since 1.21.5).
+            // The player tag is entity-shaped, so the entity scrub covers the Inventory list and, where the version
+            // writes one, the equipment compound (offhand and armor live there, not in Inventory).
             ItemLocationScrub.scrubEntity(raw);
         }
-        // On-sight map remap of the carried items: rewrite and serialize each carried map on the captured
-        // copy, once, at finish (never on the live object). Two passes for the two vanilla homes: the
-        // 36-slot Inventory list, then the equipment compound (offhand and armor).
         MapArchive archive = this.mapArchive;
         if (archive != null) {
             archive.remap(raw, "Inventory");
@@ -3055,11 +2118,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     ItemLocationScrub.scrub(enderChestStash, "Items");
                 }
                 if (archive != null) {
-                    archive.remap(enderChestStash, "Items"); // the ender chest's maps, once, before the merge
+                    archive.remap(enderChestStash, "Items");
                 }
                 PlayerTag.setEnderItems(raw, enderChestStash);
             } else if (target.mode() == DownloadMode.RESUME) {
-                carryForwardPriorEnderChest(raw); // not re-opened this session, so keep the prior download's
+                carryForwardPriorEnderChest(raw);
             }
         }
         if (rootVehicleTag != null && rootVehicleAttach != null) {
@@ -3068,10 +2131,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (target.mode() == DownloadMode.RESUME) {
             restoreSeatedMountContents(raw);
         }
-        // Creative only when the world-defaults master imposes it (with its openInCreative knob on); with the
-        // master off the world opens in the player's real game mode, matching cheats and time/weather falling
-        // back. Holding a player local does not keep gameMode alive: the teardown nulls it before the level field
-        // this assembly was admitted by, so the survival fallback here is reachable rather than defensive.
         GameType gameType = GameType.CREATIVE;
         if (!config.worldOutput().overrideWorldDefaults() || !config.worldOutput().openInCreative()) {
             PlayerControllerMP gameMode = minecraft.playerController;
@@ -3081,8 +2140,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             gameType = gameMode != null ? gameMode.getCurrentGameType() : GameType.SURVIVAL;
             if (gameType == GameType.SPECTATOR) {
                 // Vanilla applies the saved game type to every opener, so a spectator stamp opens the world in
-                // spectator, and on a world shipped without cheats there is no way back out. At 1.10.2 the client
-                // tracks no mode held before spectating, so fall back to survival.
+                // spectator.
                 gameType = GameType.SURVIVAL;
             }
         }
@@ -3091,14 +2149,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 targetDimension, gameType, difficulty);
     }
 
-    /**
-     * Salvage a minimal player finish-snapshot carrying only the seated mount's {@code RootVehicle} record and a safe
-     * spawn, for the fail-soft path where {@link #assembleCapturedPlayer} threw after the mount was already excluded
-     * from the standalone write and its loot drained from the stash. Rebuilds a fresh tag rather than reusing the
-     * partial one the throw left: only the dimension, the safe position, and the RootVehicle, none of the fallible
-     * player-state serialization. The real game mode and the rest of the player state are lost with the failed
-     * assembly, so it opens survival at the mount, which is strictly better than losing the mount too.
-     */
     private CapturedPlayer assembleSalvageMountPlayer(EntityPlayerSP player, Minecraft minecraft, UUID attach,
             NBTTagCompound mountTag) {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
@@ -3111,14 +2161,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 targetDimension, GameType.SURVIVAL, difficulty);
     }
 
-    /**
-     * Assemble the immutable progress finish-snapshot from the live client (main thread): if a stats reply has landed,
-     * the enumerated statistics, rendered to detached JSON bytes so the writer thread never touches the still-mutating
-     * live structure. Gated on its config toggle. Throwing is the caller's fail-soft contract.
-     *
-     * <p>Statistics are the whole surface at this band. Advancements arrive at 1.12, and this band's achievements are
-     * ordinary {@code achievement.*} keys inside the same statistics file rather than a second one.
-     */
     private CapturedProgress assembleCapturedProgress(EntityPlayerSP player, Minecraft minecraft) {
         boolean captureStatistics = config.captureStatistics();
         byte[] stats = captureStatistics
@@ -3150,15 +2192,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Restore a prior download's captured mount contents on a resume that finished seated in the same mount without
      * reopening its container: the fresh serialize carries empty menu-only contents, and the wholesale rewrite of the
-     * saved player would drop the prior download's folded loot. A resume that finished un-seated carries nothing (see
-     * {@link PlayerTag#restorePriorMountContents}): a dismounted mount is a normal world entity, captured by the
-     * standalone entity path, so writing it into the EntityPlayer slot would wrongly re-seat the player and collide
-     * same-UUID with the standalone copy. Runs as its own RESUME block, ungated by {@link WdlConfig} toggles (the mount
-     * is player-state, independent of the ender, inventory, and capture-entities knobs) and after the fresh
-     * {@code setRootVehicle}. Scrubs the restored mount's own coordinates per the current knob on the {@code Entity}
-     * child (not {@code scrub(raw, key)}, a no-op on a compound, and not {@code scrubEntity(raw)}, which does not
-     * descend a RootVehicle child); the prior session already map-remapped it, so it is not re-remapped. Fail-soft on a
-     * missing or unreadable prior level.dat.
+     * saved player would drop the prior download's folded loot. Scrubs the restored mount's own coordinates per the
+     * current knob on the {@code Entity} child (not {@code scrub(raw, key)}, a no-op on a compound, and not
+     * {@code scrubEntity(raw)}, which does not descend a {@code RootVehicle} child); the prior session already
+     * map-remapped it, so it is not re-remapped.
      */
     private void restorePriorMountContents(NBTTagCompound raw) {
         NBTTagCompound priorPlayer = readPriorPlayerTag();
@@ -3174,11 +2211,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Restore a seated resume's mount contents from both prior sources, in the one order that cannot lose data. The
-     * prior player record goes first because for a ridden mount it is the fresher of the two, and the entity chunks
-     * fill only what it leaves empty. Swapping them destroys whatever the record would have restored, since each
-     * carries only into a node that is still empty. Package-private so that order is testable, which is the whole
-     * reason the two calls sit in one method rather than side by side at the call site.
+     * The prior player record goes first because for a mount ridden at the last finish that wrote a player record it is
+     * the fresher copy, unless a later download wrote the mount standalone and ended with no player record (a
+     * disconnect flush, a failed assembly or a crash); the entity chunks fill only what it leaves empty. Swapping them
+     * lets the entity-chunk copy take any node both hold, since each carries only into a node that is still empty.
      */
     void restoreSeatedMountContents(NBTTagCompound raw) {
         restorePriorMountContents(raw);
@@ -3186,14 +2222,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Fill a seated resume's mount contents from the entity chunks an earlier download wrote, for the nodes
-     * {@link #restorePriorMountContents} cannot reach: that record is absent entirely when the earlier download
-     * finished on foot, and it matches per node, so a mount first ridden this session finds nothing there. Ordering
-     * against it is the whole safety property and not a preference: it runs first and this carries only into a node
-     * still empty, because for a ridden mount its record is the fresher source (a riding entity is refused every
-     * standalone write, so the entity-chunk copy is frozen at the last dismounted flush). Filling ahead of it destroyed
-     * what it would have restored. Scrubbed like the sibling and not re-remapped, the banked copy having come off disk
-     * already remapped.
+     * Scrubbed like the sibling and not re-remapped, the banked copy having come off disk already remapped.
      */
     private void restoreRecoveredMountContents(NBTTagCompound raw) {
         NBTBase rawRootVehicle = raw.getTag("RootVehicle");
@@ -3218,27 +2247,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Release a prior download's parked mount as a standalone entity on a resume, so a mount the player rode in an
-     * earlier download and has since left is preserved as a world entity rather than lost. A mount ridden at a finish
-     * is a one-player vehicle the entity capture refuses, so that finish saved it only as the RootVehicle in its saved
-     * player, and this resume's own player tag replaces that record wholesale. Nothing else carries it forward.
-     *
-     * <p>Skipped when this finish already preserved that mount itself, either by writing it as a standalone entity or
-     * by capturing it into the player's own RootVehicle, the latter matched by UUID against the whole captured mount
-     * tree rather than against its root. The root is not the mount: a mount can be ridden while itself riding another
-     * vehicle, and then the RootVehicle record holds the outer vehicle with the mount nested under it. Matching the
-     * root alone would release a mount the player is still on, putting a second copy of it in the world.
+     * The root is not the mount: a mount can be ridden while itself riding another vehicle, and then the
+     * {@code RootVehicle} record holds the outer vehicle with the mount nested under it. Matching the root alone would
+     * release a mount the player is still on, putting a second copy of it in the world.
      *
      * <p>Routed to the dimension the PRIOR tag records, not to the live {@link #targetDimension}: the position comes
      * from the prior tag too, and this session can finish anywhere, so pairing prior coordinates with the current
-     * dimension would write the mount into a folder it was never in and leave the one it was parked in empty. The
-     * writer opens the named dimension's entities storage on demand exactly as it does for a session that follows the
-     * player across a portal, and this submit precedes the end-of-stream marker.
+     * dimension would write the mount into a folder it was never in and leave the one it was parked in empty.
      *
-     * <p>Fail-soft. Every exit that reaches the release proper and does not write counts, since the mount and its
-     * archived contents are then preserved nowhere this method can see. A write the writer thread then declines is
-     * outside that guarantee. Package-private so the one path carrying a prior download's mount forward stays testable;
-     * every production caller runs behind the client singleton.
+     * <p>Every exit that reaches the release proper and does not write counts, since the mount and its archived
+     * contents are then preserved nowhere this method can see.
      */
     void releaseResumedDismountedMount(AsyncSaveWriter activeWriter) {
         if (target.mode() != DownloadMode.RESUME) {
@@ -3254,10 +2272,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (priorPlayer == null || priorRoot == null || priorEntity == null) {
             return;
         }
-        // Read before this check rather than after, because whether the finish is a no-op is a question about
-        // WHICH mount the player ended on, which only the prior tag answers. The exclusion set is this finish's
-        // captured mount tree and is empty when no mount was captured, so a null capturedPlayer (the
-        // disconnect flush and the failed assembly) falls through to the release, which is where it belongs.
+        // A null capturedPlayer (the disconnect flush and the failed assembly) skips the exclusion check and falls
+        // through to the release, since this finish writes no player record of its own.
         UUID priorMountUuid = EntityMerge.readUuid(priorEntity);
         if (priorMountUuid != null && (savedEntities.contains(priorMountUuid)
                 || (capturedPlayer != null && excludedRootVehicleUuids.contains(priorMountUuid)))) {
@@ -3288,17 +2304,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** Count and surface a prior download's parked mount the release could not place (main thread). */
     private void recordResumedMountLoss(String reason) {
         resumedMountsLost++;
         LOGGER.warn("could not release the resumed dismounted mount to a standalone entity: {}; it and the "
                 + "contents the previous download archived in it are absent from the save", reason);
     }
 
-    /**
-     * The {@link ChunkPos} an entity tag's {@code "Pos"} (a three-double x, y, z list) lands in, or null when
-     * {@code "Pos"} is missing or malformed.
-     */
     private @Nullable ChunkPos mountEntityChunk(NBTTagCompound entity) {
         NBTTagList pos = entity.getTagList("Pos", 6);
         if (pos.tagCount() < 3) {
@@ -3310,13 +2321,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return new ChunkPos(new BlockPos(MathHelper.floor(x), MathHelper.floor(y), MathHelper.floor(z)));
     }
 
-    /**
-     * The prior download's captured player tag read through this band's own save layout via
-     * {@link LevelDataWriter#readPriorPlayer}, or null when the folder is fresh or no player was written (fail-soft).
-     * The read mirror of the player write: where the player lives on disk drifts across bands, so the plug that wrote
-     * it reads it back. A plain main-thread file read, not MC-state-coupled, so the cross-queue immutability invariant
-     * holds.
-     */
     private @Nullable NBTTagCompound readPriorPlayerTag() {
         Path file = levelDatFile;
         if (file == null) {
@@ -3330,13 +2334,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** The prior level.dat's {@code Data} compound, or null when absent; a present but unreadable file throws. */
     private @Nullable NBTTagCompound readPriorData() throws IOException {
         Path file = levelDatFile;
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        // 1.10.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(file)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             return root.getTag("Data") instanceof NBTTagCompound ? (NBTTagCompound) root.getTag("Data") : null;
@@ -3344,12 +2346,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * At resume init, mark the shared player ender inventory already recovered so the outline draws no rim on any ender
-     * chest without the player reopening one. Gated so the rim never claims a save this resume will strip: only on a
-     * RESUME with savePlayerEnderChest on this session and a present, non-empty prior {@code "EnderItems"}. If the
-     * toggle is off this session the resume drops the ender inventory, so the fact must not be marked; if it was off
-     * last session the prior save has no EnderItems, so the non-empty guard leaves the rims red on its own. Mirrors the
-     * non-empty guard {@link PlayerTag#carryForwardEnderItems} uses.
+     * If the toggle is off this session the resume drops the ender inventory, so the fact must not be marked; if it was
+     * off last session the prior save has no {@code EnderItems}, so the non-empty guard leaves the rims red on its own.
      */
     private void markPriorEnderRecovered() {
         if (target.mode() != DownloadMode.RESUME || !config.savePlayerEnderChest()) {
@@ -3362,12 +2360,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * The {@code LevelName} to write into level.dat: a new download uses the target's resolved name, the dated folder
-     * name unless the date suffix is off, while a resume preserves the existing world's name read from the prior
-     * level.dat (null when absent or unreadable, letting the writer apply its default), so re-running into a folder
-     * never renames the world it already produced.
-     */
     private @Nullable String resolveWorldName() {
         if (target.mode() == DownloadMode.RESUME) {
             return readPriorLevelName();
@@ -3375,7 +2367,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return target.worldName();
     }
 
-    /** The prior level.dat's {@code Data.LevelName}, or null when it is absent or unreadable (fail-soft). */
     private @Nullable String readPriorLevelName() {
         try {
             NBTTagCompound data = readPriorData();
@@ -3383,9 +2374,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 return data.hasKey("LevelName") ? data.getString("LevelName") : null;
             }
         } catch (IOException | RuntimeException e) {
-            // The level.dat is present but unreadable, so the resume cannot preserve the world's name and falls
-            // back to the default. Surface it rather than renaming the world silently (the read can fail on a
-            // transient file lock, which the Windows gate has shown is real).
             LOGGER.warn("failed to read the prior level.dat name on resume; using the default name", e);
             if (config.showChatMessages()) {
                 bridge.sendChat(ChatCopy.worldNameFallback());
@@ -3396,17 +2384,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Run a finish-time capture assembly and degrade a throw to a null snapshot (fail-soft): a serialize or scrub bug
-     * in one step then drops that step to absent (the player path opens at the default spawn with no EntityPlayer tag,
-     * taking the inventory, the ender chest and the game mode with it; the progress path writes no statistics file)
-     * instead of aborting the save after chunks have committed and leaving a chunks-without-level.dat unopenable world.
+     * in one step then drops that step to absent instead of aborting the rest of the finish.
      *
      * <p>The degradation is deliberate and stays. What does not is reporting the download that took it as clean, so
      * every degraded step counts toward the partial-finish verdict, and {@code step} names on the line which one it
      * was: several steps share this, and a line naming none of them leaves a reader unable to tell a lost player from
      * lost statistics.
-     *
-     * <p>Package-private and an instance method, so the tally it feeds and the fail-soft contract are both
-     * headless-testable on one session.
      */
     <T> @Nullable T failSoft(String step, Supplier<T> assembly) {
         try {
@@ -3418,43 +2401,27 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * The {@link MapArchive.ImageResolver}: resolve a session-local map id to its serialized inner data tag, or null if
-     * the client never received its colors (a chest-only or nested map, the imageless case). The imaged map is
-     * auto-locked by default so the archived image is frozen against the void-world repaint. Runs on the main thread
-     * (every {@link MapArchive#archiveIdFor} call is), where the mutable {@code MapData} may be read.
-     */
     private @Nullable NBTBase resolveMapImage(int sessionId) {
-        // The classic by-key map load reads the persisted MapData through the world's MapStorage, the same store the
-        // vanilla map item loads from; the modern Level.getMapData accessor does not exist at this band.
         MapData saved = (MapData) level().getMapStorage().getOrLoadData(MapData.class, "map_" + sessionId);
         if (saved == null) {
-            return null; // colors never received (imageless): skipped, never fabricated
+            return null;
         }
         NBTBase mapTag = adapter.mapSink().serializeMap(saved);
-        // 1.10.2 MapData has no locked() copy method, and mutating the live client map's locked flag would
-        // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
         if (config.lockDownloadedMaps() && mapTag instanceof NBTTagCompound) {
             ((NBTTagCompound) mapTag).setBoolean("locked", true);
         }
         return mapTag;
     }
 
-    // 1.10.2 has no Entity.shouldBeSaved(); reproduce its predicate: a removed, riding, or single-player-vehicle
-    // entity is not written standalone.
     private static boolean shouldSaveEntity(Entity entity) {
         return !entity.isDead && !entity.isRiding()
                 && (!entity.isBeingRidden() || entity.getRecursivePassengersByType(EntityPlayer.class).size() != 1);
     }
 
     /**
-     * Load the map-id manifest, degrading a read failure to an empty manifest so a download never stops, and counting
-     * that degradation: this download then re-images every map the folder already holds, and its archived ids are no
-     * longer distinguishable from fresh ones, which is the same shared-file consequence a failed manifest write leaves
-     * behind. The floor is raised outside that catch on purpose: the counter high-water lives in the manifest, so
-     * folding the two reads into one try would let a fault in the floor scan discard a manifest that parsed cleanly,
-     * and the empty manifest that replaced it would restart at 0 and write this download's first map over the prior
-     * download's {@code data/map_0.dat}. Package-private so the tally it feeds stays testable.
+     * The floor is raised outside that catch on purpose: the counter high-water lives in the manifest, so the empty
+     * manifest that replaced it would restart at 0 and write this download's first map over the prior download's
+     * {@code data/map_0.dat}.
      */
     MapManifest loadManifest(Path file, Path dataDirectory) {
         MapManifest manifest;
@@ -3470,11 +2437,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return manifest;
     }
 
-    /**
-     * The map archive for this download: on-mode wraps the loaded remap manifest; off-mode keeps the original server
-     * ids and reconstructs the idcounts floor from disk (there is no manifest to persist it), seeding past the highest
-     * existing data file and any prior idcounts.dat so a resume never re-issues a captured id.
-     */
     private MapArchive createMapArchive(Path mapIdsFile, Path dataDirectory) {
         if (config.remapMapIds()) {
             return new MapArchive(loadManifest(mapIdsFile, dataDirectory), this::resolveMapImage,
@@ -3484,14 +2446,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 onDiskMapIdFloor(dataDirectory));
     }
 
-    /** The highest map id the folder is already known to have used, or -1 if it holds none. */
     private static int onDiskMapIdFloor(Path dataDirectory) {
         return Math.max(dataFileFloor(dataDirectory), idCountsFloor(dataDirectory));
     }
 
     /**
-     * The map-id floor from the existing {@code data/map_<n>.dat} files, or -1 if that read faults. Its own -1 fallback
-     * keeps a fault in this source from discarding the idcounts floor read independently below.
+     * Its own -1 fallback keeps a fault in this source from discarding the idcounts floor read independently below.
      */
     private static int dataFileFloor(Path dataDirectory) {
         try {
@@ -3503,11 +2463,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The map-id floor from a prior {@code idcounts.dat}, or -1 if that read faults. Its own -1 fallback keeps a fault
-     * in this source from discarding the data-file floor read independently above. It can exceed the data-file source,
-     * which is why both are read: an imageless id writes no data file, so a prior download whose highest id was
-     * imageless is recorded here and nowhere else. It only reaches disk at finalize, so a prior download that crashed
-     * leaves this source empty and the data-file scan carrying the floor alone.
+     * Its own -1 fallback keeps a fault in this source from discarding the data-file floor read independently above. It
+     * can exceed the data-file source, which is why both are read: an imageless id writes no data file, so a prior
+     * download whose highest id was imageless is recorded here and in no data file. It only reaches disk at finalize,
+     * so a prior download that crashed leaves this source empty and the data-file scan carrying the floor alone.
      */
     private static int idCountsFloor(Path dataDirectory) {
         try {
@@ -3519,12 +2478,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The one map data write task, shared by the on-sight streaming arm and the finish batch. It absorbs its own
-     * {@link IOException}, which a {@link Runnable} could not throw anyway, and its own {@link RuntimeException}, which
-     * it must absorb because the shared task catches would log a runtime throw without counting it, and an uncounted
-     * loss lets the finish report a download that lost maps as clean. {@code failures} is incremented once per failed
-     * write and never otherwise, and {@code loss} names every lost map on its own line while carrying the stack once
-     * per distinct cause type. Package-private so the counting contract stays testable.
+     * It absorbs its own {@link IOException}, which a {@link Runnable} could not throw anyway, and its own
+     * {@link RuntimeException}, which it must absorb because the shared task catches would log a runtime throw without
+     * counting it, and an uncounted loss lets the finish report a download that lost maps as clean.
      */
     static Runnable mapWriteTask(Path dataDirectory, String key, NBTBase dataTag, AtomicInteger failures,
             CaptureLossLog loss) {
@@ -3538,28 +2494,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         };
     }
 
-    /**
-     * The on-sight map stream: hand one first-imaged map's data tag to the writer thread to land as
-     * {@code data/map_<id>.dat}. A map imaged during capture is submitted alone, so it reaches disk at once and a
-     * crashed capture keeps the maps it already saw. One imaged during the finish drain joins {@link #finishMapWrites}
-     * instead, because a display wall can image five figures of them in that one drain and the bar has to advance over
-     * them rather than sit frozen on the chunk phase; a crash inside those few seconds loses an unopenable save anyway,
-     * so nothing durable is traded for the bar. Called on the main thread from the remap paths, which all run behind
-     * {@code ensureWriter}; the write runs on the writer thread, interleaved with the chunk drain and behind a resume's
-     * preflight backup. Whatever write is handed to either arm must catch and count its own failure; see
-     * {@link #mapWriteTask}. Neither arm counts, both absorb a runtime throw, so a write that does not increment the
-     * tally reports a download that lost maps as clean. Package-private so the tally this hands the task stays
-     * testable.
-     */
     void streamMapData(int archiveId, NBTBase dataTag) {
         AsyncSaveWriter activeWriter = this.writer;
         WorldPaths paths = this.worldPaths;
         if (activeWriter == null || paths == null) {
-            // Unreachable from production today: every remap site runs behind ensureWriter, which sets both.
-            // Counted and logged so a future pre-writer remap site becomes visible instead of losing a map the
-            // archive's imaged gate already considers streamed. Logged directly rather than through the write
-            // voice because no throwable exists here, and inventing one would spend that voice's stack budget
-            // for its type on a loss whose cause is the message itself.
             mapsFailed.incrementAndGet();
             LOGGER.info("map data {} had no writer to stream to; it is missing from the save",
                     ("map_" + archiveId));
@@ -3568,10 +2506,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Path dataDirectory = paths.dataDirectory();
         String key = ("map_" + archiveId);
         if (finishBatchClosed) {
-            // Unreachable today: every remap site precedes the handover, and the inbound hooks are detached
-            // before it. Counted and logged so a future late remap site becomes visible instead of losing a map
-            // to a writer that drops post-finish work. Logged directly rather than through the write voice for
-            // the same reason as the branch above: no throwable exists to key a stack budget on.
             mapsFailed.incrementAndGet();
             LOGGER.info("map data {} was imaged after the finish batch closed; it is missing from the save", key);
             return;
@@ -3585,22 +2519,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
         activeWriter.submit(write);
     }
 
-    /**
-     * Write the finalize-time idcounts, after level.dat: the streamed map files are already on disk, so this is the one
-     * remaining data/ write. Runs on the writer thread at finalize; the statements here name no thread, but the
-     * {@code mapArchive} they read is non-volatile and is visible there because world-open assigns it before that
-     * thread exists. Caught so an idcounts IO failure never aborts the otherwise-complete save; the cost is that the
-     * reopened world's allocator may reissue a captured id, logged as such. Package-private so the tally it feeds stays
-     * testable.
-     */
     void writeIdCounts(WorldPaths paths) {
         MapArchive archive = this.mapArchive;
         if (archive == null) {
-            return; // the world never opened for writing
+            return;
         }
         NBTBase idCounts = archive.idCountsTag();
         if (idCounts == null) {
-            return; // no id was referenced or seeded this session
+            return;
         }
         try {
             MapDataWriter.writeIdCounts(paths.dataDirectory(), idCounts);
@@ -3611,15 +2537,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Rewrite the map-id manifest on the writer thread, after the {@code data/} files, via the atomic-move save so a
-     * torn write leaves the prior manifest intact. Fail-soft: a manifest write failure is logged and recorded, never
-     * thrown, so it can never abort the otherwise-complete save while a resume that would silently re-image every map
-     * in the folder is still reported.
-     *
-     * <p>The record is the end state rather than a tally of attempts, which is what the success arm clearing it is for:
+     * The record is the end state rather than a tally of attempts, which is what the success arm clearing it is for:
      * the world-open scheme signal and the finalize rewrite are the same file, so a fault at the first that the second
-     * repairs cost the download nothing and must not report it partial. Package-private so the flag it sets stays
-     * testable. Runs on the main thread at world-open and on the writer thread at finalize.
+     * repairs cost the download nothing and must not report it partial.
      */
     void saveMapManifest() {
         MapArchive archive = this.mapArchive;
@@ -3642,23 +2562,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * The manifest losses this download carries: the read fault, which nothing repairs, plus one for the written file
-     * if it is still stale as the download ends.
-     */
     private int mapManifestLosses() {
         return mapManifestReadFailed + (mapManifestStale ? 1 : 0);
     }
 
     /**
-     * Bind the three world-open surfaces the map-tally paths read, standing in for the tail of {@link #ensureWriter},
-     * which cannot run headlessly because it resolves the level source through the client singleton. It has no
-     * production caller and is not an alternative way to open a world: production binds these three in
-     * {@code ensureWriter}, which also takes the session lock this one knows nothing about. The writer arrives as a
-     * factory rather than an instance so the paths and the archive are published before the writer thread exists, the
-     * same edge {@code ensureWriter} gets by constructing the writer last; handing over a running writer instead would
-     * race the finalizer's read of them. The other surfaces that step binds ({@code mapIdsFile}, {@code levelDatFile},
-     * and the report triple) stay unset, so the manifest and completion-record paths remain closed on such a session.
+     * The writer arrives as a factory rather than an instance so the paths and the archive are published before the
+     * writer thread exists, the same edge {@code ensureWriter} gets by constructing the writer last; handing over a
+     * running writer instead would race the finalizer's read of them.
      *
      * @param writerFactory must construct the writer inside {@code get()}; handing back one that already exists reopens
      *                      the race this parameter shape is here to close
@@ -3671,18 +2582,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return bound;
     }
 
-    /**
-     * Open the world for writing once and start the background {@link AsyncSaveWriter}. Lazy so a never-captured
-     * session creates nothing; idempotent so the flush pump and {@code finish()} share one writer. Returns null (and
-     * records {@link #startError}) if the world cannot be opened; that failure is logged once where it is surfaced
-     * (reportSaveFailure at finish), not here, so a deferred open error is not dumped to the log twice.
-     */
     private @Nullable AsyncSaveWriter ensureWriter() {
         if (writer != null) {
             return writer;
         }
         if (startError != null) {
-            return null; // a prior open attempt failed; the failure is reported at finish()
+            return null;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
         AsyncSaveWriter opened = openWorld(minecraft.getSaveLoader(), minecraft.mcDataDir.toPath().resolve("saves"),
@@ -3693,61 +2598,39 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return opened;
     }
 
-    /**
-     * The world-open proper, with the client singleton resolved by the caller, and the saves root with it, this band's
-     * save format carrying no accessor for it. The report stamp arrives as a thunk so that gathering its MC-side facts
-     * cannot abort the open, and package-private so that guarantee is headless-testable.
-     */
     @Nullable
     AsyncSaveWriter openWorld(ISaveFormat source, Path savesDirectory, Consumer<Path> reportStep) {
         ISaveHandler storage;
         try {
             // Path containment: assert the resolved level root stays under the saves base before getSaveLoader, which
-            // creates the folder plus its advisory session.lock, so the check must run first or an escape touches
-            // disk. toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
-            // This band's save format has no saves-root accessor; the saves base is the game directory's saves folder,
-            // the same root it constructs the level source over.
+            // creates the folder plus its advisory session.lock, so the check must run first or an escape touches disk.
+            // toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
             Path savesBase = savesDirectory.toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
-            // A download folder is a single component directly under saves; requiring the parent to be exactly
-            // the saves base rejects both a parent-escape and any multi-component name (whose first segment could
-            // be a symlink the lexical normalize cannot see). Every saveName that reaches here is single-component
-            // (the screen sanitizes separators; resume names are directory leaves).
+            // A download folder is a single component directly under saves; requiring the parent to be exactly the
+            // saves base rejects both a parent-escape and any multi-component name (whose first segment could be a
+            // symlink the lexical normalize cannot see).
             if (!resolved.startsWith(savesBase) || !savesBase.equals(resolved.getParent())) {
                 throw new IOException("the download folder escapes the saves directory: " + saveName);
             }
-            // This band's getSaveLoader returns the ISaveHandler for the named world, which is what the level-data
-            // writer and the save-root read (getWorldDirectory) need.
             storage = source.getSaveLoader(saveName, false);
         } catch (IOException | RuntimeException e) {
             startError = e;
             return null;
         }
         try {
-            // level.dat: a superflat VOID world. The version-coupled saveLevelData call lives behind
-            // LevelDataWriter.save() (its vanilla signature drifts across bands), so this shared session stays
-            // cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
-            // At 1.10.2 the level directory is the ISaveFormat folder, which roots WorldPaths, the map manifest and
-            // the export zip.
             Path saveRoot = storage.getWorldDirectory().toPath();
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.worldPaths = paths;
             this.mapIdsFile = MapManifest.pathIn(saveRoot);
-            this.levelDatFile = saveRoot.resolve("level.dat"); // read on a resume to carry the ender chest forward
+            this.levelDatFile = saveRoot.resolve("level.dat");
 
-            // Load the map-id manifest once at world-open (empty for a fresh download; seeded past every used
-            // id on a resume). The live remap table streams each map on-sight from here on.
             this.mapArchive = createMapArchive(MapManifest.pathIn(saveRoot), paths.dataDirectory());
-            // Plant the scheme signal at open for a NEW download only, before any map data streams:
-            // schemeMismatch reads manifest presence as the remap-on marker, and NEW takes no backup, so the
-            // plant cannot corrupt one. A resume's map surfaces must not change before the preflight backup
-            // snapshots them: a matched resume's manifest is already present, and an off-mode resume's stale
-            // manifest is deleted at finalize (saveMapManifest below), not here. The deliberate residue: a
-            // mismatch-confirmed remap-on resume of an off-mode folder plants nothing, so a crash there
-            // leaves streamed archive-scheme files with no signal, an accepted best-effort residue. The
-            // mirror direction is accepted too: a mismatch-confirmed off-mode resume of a remap-on folder
-            // crashing before the finalize delete leaves the stale manifest beside verbatim-id files, so
-            // the folder misreads as remap-on until the next completed session heals it.
+            // Plant the scheme signal at open for a NEW download only, before any map data streams: schemeMismatch
+            // reads manifest presence as the remap-on marker, and NEW takes no backup, so the plant cannot corrupt one.
+            // A resume's map surfaces must not change before the preflight backup snapshots them: a matched resume that
+            // holds map data already carries its signal, and an off-mode resume's stale manifest is deleted at finalize
+            // (saveMapManifest below), not here.
             if (target.mode() == DownloadMode.NEW) {
                 saveMapManifest();
             }
@@ -3764,79 +2647,45 @@ public final class LiveCaptureSession implements CaptureController.Session {
             surfaceGameRuleOverrideLoss(levelData.gameRules());
             writer = new AsyncSaveWriter(
                     paths::openRegionStorage,
-                    // Pre-merge safety copy on a resume, on the writer thread before any chunk is written into the
-                    // folder; a no-op for a fresh download or with zipOnResume off. The in-progress download.md
-                    // regenerates strictly after the backup, so the zip archives the prior session's rendering
-                    // untouched (begin wrote only the crash sentinel, which the zipper excludes). saveRoot and
-                    // target are settled before the writer starts, so the thunk closes over stable values.
+                    // The in-progress download.md regenerates strictly after the backup, so the zip archives the prior
+                    // session's rendering untouched.
                     () -> {
                         FinalizeOutputs.backupBeforeResume(saveRoot, target.mode(), config.zipOnResume());
                         report.refreshHumanRendering(saveRoot);
                     },
-                    // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunks:
-                    // ensureWriter builds these thunks at the first incremental flush, mid-capture,
-                    // before finish() sets the fields, so a snapshot taken here would always be null. The thunks run
-                    // on the writer thread strictly after the chunk drain, so the fields set in finish() are visible.
-                    // level.dat is written FIRST, then idcounts (the map files themselves streamed during capture),
-                    // each write caught, so a map IO failure never aborts before level.dat (an unopenable save) or
-                    // fails it.
+                    // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunks: ensureWriter builds
+                    // these thunks at the first incremental flush, mid-capture, before finish() sets the fields, so a
+                    // snapshot taken here would always be null. The thunks run on the writer thread strictly after the
+                    // chunk drain, so the fields set in finish() are visible.
                     () -> levelDataWriter.save(storage, levelData, capturedPlayer),
                     (chunksFailed, entityChunksFailed) -> {
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
                         writeIdCounts(paths);
                         saveMapManifest(); // after the data/ files, so a torn write never precedes them
-                        // the finish marker, just before the storages close; carries the writer's soft
-                        // tally so the record stamps the real clean-or-partial status
                         writeReportCompletion(chunksFailed, entityChunksFailed);
                     },
-                    // Finish-time output after the folder is fully written and closed: the export zip
-                    // when zipOnFinish is on. The download screen reads each row's size by walking the folder.
                     () -> FinalizeOutputs.exportZip(saveRoot, config.zipOnFinish(), progress),
                     progress);
-            // Observe each carried-forward on-disk chunk for the outline's recovered-coverage scan.
-            // Self-gating: the writer reads the prior chunk only when one exists, so this is a no-op on a fresh
-            // download and runs only on a resume, reusing the writer's own read rather than a second region store.
-            // The entities-store sibling marks a prior-captured container entity recovered by its UUID the same way.
             writer.observeResumeReads(recoveredScan::record);
-            // One read, two consumers. The entity read is the only source for a prior record in a chunk file this
-            // write is not touching, so it is not gated on the outline the way the block read is.
             writer.observeEntityResumeReads((dimension, onDisk) -> {
                 recoveredScan.recordEntities(dimension, onDisk);
                 recoveredEntityContent.record(onDisk);
             });
             writer.carryRecoveredEntityContent(recoveredEntityContent);
-            // The shared ender inventory is global, not per-chunk, so it is read once here at resume init rather
-            // than through the chunk scan: mark it recovered when the prior download already holds it.
             markPriorEnderRecovered();
             return writer;
         } catch (RuntimeException e) {
-            // Nothing to close: the vanilla ISaveFormat holds no OS lock at this band (session.lock is advisory).
             startError = e;
             return null;
         }
     }
 
-    /**
-     * Surface the cross-band game-rule override loss to the player: a configured override whose id does not exist at
-     * the running band is dropped, and because the curated safe set still applies the world still looks safe, so the
-     * loss is surfaced rather than only debug-logged. Runs on the client main thread (level.dat is built there), where
-     * messaging the player is safe.
-     */
     private void surfaceGameRuleOverrideLoss(GameRuleResolution gameRules) {
         if (!gameRules.unknownIds().isEmpty() && config.showChatMessages()) {
             bridge.sendChat(ChatCopy.gameRuleOverridesSkipped(String.join(", ", gameRules.unknownIds())));
         }
     }
 
-    /**
-     * Seed the coverage overlay with the current dimension's prior on-disk coverage on a resumed download, once per
-     * live dimension id. Gated on a resume and on a map overlay mod being present, so the header scan is skipped when
-     * nothing will consume it. It runs on the writer thread in order with the drain, off the render thread and never
-     * racing a write, and keys the indexes by the live client id (matching the record-site write and the overlay
-     * providers' query) while reading the vanilla-type-routed region folder. The prior chunks seed both the saved and
-     * the covered index, so a resumed prior draws in the covered hue rather than the suspect one: the prior session's
-     * path was not observed, so marking it suspect would be a guess.
-     */
     private void maybeSeedOverlayCoverage(AsyncSaveWriter activeWriter) {
         WorldPaths paths = worldPaths;
         if (!overlayActive || target.mode() != DownloadMode.RESUME || paths == null) {
@@ -3854,26 +2703,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
         });
     }
 
-    /**
-     * Merge each eligible buffered chunk's pending container stash into its tag, hand the tag to the writer, and drop
-     * it from the buffer. With {@code all} the whole buffer is flushed (the finish-time drain and the capture-paused
-     * drain); otherwise only chunks farther than {@code keepHot} from the center. Merge-before-flush: a container
-     * opened while the chunk was hot is folded in before the tag leaves memory, and distance-gating means no new
-     * container can be opened in a chunk being flushed. Package-private so the block-container tally its submit thunks
-     * feed stays testable; every production caller is in this class and reaches it behind the client.
-     */
     void flushBuffer(AsyncSaveWriter activeWriter, boolean all, int centerX, int centerZ, int keepHot) {
         maybeSeedOverlayCoverage(activeWriter);
         ContainerSink containerSink = adapter.containerSink();
         LecternSink lecternSink = adapter.lecternSink();
         ChunkCodec codec = adapter.chunkCodec();
-        // skipVoidChunks (default off): omit a captured chunk that carries nothing worth saving. Honored under
-        // every generator (a user choice); under DEFAULT/FLAT a dropped void position regenerates as terrain, an
-        // accepted trade stated in the config copy, so this is deliberately not gated on the world type. Entity
-        // presence is taken from both the buffered entities (promoted, awaiting flush) and the still-accumulated
-        // ones (held in the packet capture, e.g. budget-deferred this tick), because dropping a chunk's
-        // allCaptured position is lossless only when no entity belongs to it: allCaptured is the
-        // entity privacy gate, so a void position may be removed but an entity-bearing one must not.
+        // Entity presence is taken from both the buffered entities (promoted, awaiting flush) and the still-accumulated
+        // ones (held in the packet capture, e.g. budget-deferred this tick), because dropping a chunk's allCaptured
+        // position is lossless only when no entity belongs to it: allCaptured is the entity privacy gate, so a void
+        // position may be removed but an entity-bearing one must not.
         boolean skipVoid = config.worldOutput().skipVoidChunks();
         Set<ChunkPos> bufferedEntityChunks = skipVoid ? entityBuffer.bufferedChunks() : Collections.emptySet();
         LongSet accumulatedEntityChunks = skipVoid && packetCapture != null ? packetCapture.chunks(liveDimensionId)
@@ -3909,30 +2747,20 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (skipVoid
                     && isVoidChunk(pos, snapshot, bufferedEntityChunks, accumulatedEntityChunks,
                             pendingInteractionChunks)) {
-                // Lossless: a VOID world regenerates this position as air identically, so dropping it (and its
-                // allCaptured position) keeps the count and resume honest. The live overlay keeps the position
-                // (the indexes have no per-position remove); presence-only, cleared once the save completes,
-                // and a resume re-seeds from disk, so the overstatement never survives the session.
                 allCaptured.remove(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
                 entries.remove();
                 continue;
             }
-            // Drain this chunk's open-time holders out of the shared stashes into a per-submit bundle the writer
-            // thunk then solely owns. The main thread prepares them (scrub + map remap below) and forgets them,
-            // so only immutable, detached data crosses to the writer (the thread-handoff boundary rule).
+            // Drain this chunk's open-time holders out of the shared stashes into a per-submit bundle the writer thunk
+            // then solely owns. The main thread prepares them and forgets them, so only detached data crosses to the
+            // writer.
             Map<BlockPos, NBTTagCompound> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, NBTTagCompound> lecterns = drainChunkHolders(lecternStash, pos);
             // Scrub and on-sight map remap each drained holder exactly once, here at drain time and never as a
             // whole-stash pass: the stash holds every not-yet-flushed container, which a dense storage room keeps hot
             // for a whole session, so a per-tick pass over it scales with everything opened, while the drain-time
-            // prepare costs only the holders actually flushing and still precedes everything writer-bound. A map in a
-            // chest whose chunk flushes mid-roam is thereby captured before it leaves memory.
+            // prepare costs only the holders actually flushing and still precedes everything writer-bound.
             prepareDrainedItems(containers);
-            // Drain and reconcile this chunk's interaction-predicted candidates against the captured snapshot's
-            // block-state. The confirmed "Items" are scrubbed and map remapped like the open-time path, then folded
-            // into the container bundle behind the open-time-wins precedence (an opened container at the same pos
-            // supersedes a possibly-stale place snapshot). The jukebox holders carry to the writer thunk for their
-            // own field-copy merge.
             final Map<BlockPos, NBTTagCompound> holders;
             if (interactionCapture != null) {
                 // drainChunk reconciles each candidate against this snapshot, the very one the writer thunk below
@@ -3951,38 +2779,23 @@ public final class LiveCaptureSession implements CaptureController.Session {
             } else {
                 holders = ImmutableMap.of();
             }
-            // Count the folds on main against the snapshot's block entities (the x/y/z match the writer-side fold
-            // re-makes against the encoded tag), so the live HUD count stays incremental even though the fold
-            // itself runs on the writer. A holder that matches a captured block entity here will match the encoded
-            // tag on the writer; the rare deferred encode failure then over-counts, accepted for a cosmetic figure.
             List<BlockPos> landingContainers = ChunkFlushPlan.landingHolderPositions(snapshot, containers);
             mergedContainers += landingContainers.size();
             mergedLecterns += ChunkFlushPlan.landingHolderPositions(snapshot, lecterns).size();
             mergedContainers += ChunkFlushPlan.landingHolderPositions(snapshot, holders).size();
-            // Defer the heavy serialize plus the pure container/lectern fold to the writer thread:
-            // the thunk closes over the detached snapshot, the drained holders, and the per-band codec/sinks, all
-            // immutable, so the render thread never runs ChunkSerializer.write. The target dimension is read here on
-            // main (submit time), not in the thunk, so a rebind cannot misroute.
+            // The target dimension is read here on main (submit time), not in the thunk, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
-            // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot or on a
-            // shelf), the one item-borne surface the item-list scrub above never sees. Done here, on the main
-            // thread and only for the chunks draining this pass, so the writer thunk encodes an already-scrubbed
-            // snapshot: the block-entity NBT is our detached copy, and this is the block-entity analogue of the
-            // per-drained-holder prepare, never a per-tick pass over the whole buffer.
+            // Blank any item-borne coordinate riding a block entity's own NBT, the one item-borne surface the item-list
+            // scrub above never sees.
             if (!config.saveItemCoordinates()) {
                 for (NBTTagCompound blockEntity : snapshot.blockEntities()) {
                     ItemLocationScrub.scrubBlockEntity(blockEntity);
                 }
             }
-            // Consumed by this write, not held: the copy this write leaves on disk is post-placement, so the
-            // next visit's carry-forward is reading its own capture rather than the replaced block's. Holding
-            // it would suppress forever, which erases what this download archived on every later pass.
-            // Committed here, at enqueue, with the residual that follows from it: an encode throw or a failed
-            // or preserved write leaves the prior on disk with the suppression already spent, so the next
-            // visit carries the replaced block's contents forward. The alternative is not holding it, which is
-            // the routine erasure above, but confirming per position across the writer boundary, which is
-            // state this side cannot read without a second producer on main-thread data.
+            // Consumed by this write, not held: the copy this write leaves on disk is post-placement, so the next
+            // visit's carry-forward is reading its own capture rather than the replaced block's. Holding it would
+            // suppress forever, which erases what this download archived on every later pass.
             LongSet replacedHere = ChunkFlushPlan.replacedIn(pos, replacedBlockKeys);
             replacedBlockKeys.removeAll(replacedHere);
             activeWriter.submitChunk(targetDimension, pos,
@@ -4003,8 +2816,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Whether {@code pos}'s captured chunk is void (safe to omit): no non-air blocks, no block-entities, no captured
      * entities (buffered or accumulated), no captured containers, and no pending interaction prediction (else dropping
-     * the chunk would leak its undrained stash entry). The decision is taken here, against the artifact about to be
-     * written, so it cannot drift from what is thrown away.
+     * the chunk would leak its undrained stash entry).
      */
     private boolean isVoidChunk(ChunkPos pos, ChunkSnapshotSource snapshot, Set<ChunkPos> bufferedEntityChunks,
             LongSet accumulatedEntityChunks, Set<ChunkPos> pendingInteractionChunks) {
@@ -4016,7 +2828,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 hasNonAirBlocks(snapshot), !snapshot.blockEntities().isEmpty(), hasEntities, hasContainers);
     }
 
-    /** Whether any captured section of {@code snapshot} holds a non-air block state. */
     private static boolean hasNonAirBlocks(ChunkSnapshotSource snapshot) {
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             ExtendedBlockStorage chunkSection = section.chunkSection();
@@ -4027,7 +2838,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return false;
     }
 
-    /** Whether {@code stash} holds any open-time container holder located in {@code pos}'s chunk. */
     private static boolean anyHolderInChunk(Map<BlockPos, ?> stash, ChunkPos pos) {
         for (BlockPos holderPos : stash.keySet()) {
             if (new ChunkPos(holderPos).equals(pos)) {
@@ -4038,12 +2848,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Drain (remove and return) the stash holders located in {@code pos}'s chunk, unpacked and bundled for the
-     * writer-thread fold. Mirrors {@link ContainerMerge}'s per-chunk locator, but on the main thread, so the shared
-     * stash is left holding only other chunks' still-open holders. An unpack failure drops that one holder rather than
-     * aborting the per-tick flush, and un-marks the position as captured, so the outline re-rims it and a re-open can
-     * recover the contents; a retry would deterministically re-fail against the same packed bytes. The bind-time report
-     * count stays high by one, accepted for a cannot-happen path.
+     * An unpack failure drops that one holder rather than aborting the per-tick flush, and un-marks the position as
+     * captured, so the outline re-rims it and a re-open can recover the contents; a retry would deterministically
+     * re-fail against the same packed bytes.
      */
     private Map<BlockPos, NBTTagCompound> drainChunkHolders(Map<BlockPos, StashHolder> stash, ChunkPos pos) {
         Map<BlockPos, NBTTagCompound> bundle = new LinkedHashMap<>();
@@ -4066,21 +2873,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return bundle;
     }
 
-    /**
-     * Sweep the container and lectern holders still stashed after a whole-buffer drain: the open-time contents of a
-     * container opened in a chunk that had already left the keep-hot buffer. Its chunk is on disk but was never
-     * re-buffered (the allCaptured skip in {@link #captureLoadedChunks}), so the per-chunk drain never reached its
-     * holder; fold each residual holder into its on-disk chunk through a writer-thread read-modify-write, so
-     * backtracking through an already-flushed base still saves what the player opened. Runs only on a whole-buffer
-     * drain ({@code all}), never per tick, so it adds no per-tick whole-stash pass. Finish and the dimension rebind
-     * always reach it (both call {@link #flushBuffer} directly); the capture-paused drain reaches it only alongside a
-     * non-empty keep-hot buffer, since {@link #pumpFlush} returns early on an empty buffer, so finish is the backstop
-     * that guarantees every residual holder is swept. The rebind drain runs it before the dimension swap under the old
-     * dimension, so a residual holder never crosses a portal into another dimension's {@link ChunkPos} space. The
-     * interaction-prediction candidates are deliberately not swept: their reconcile gate confirms a candidate against
-     * the live captured snapshot's block-state, which an orphaned chunk no longer holds, so a candidate cannot be
-     * confirmed off the on-disk chunk (and a placed container is not even present there).
-     */
     private void sweepOrphanedHolders(AsyncSaveWriter activeWriter) {
         if (containerStash.isEmpty() && lecternStash.isEmpty()) {
             return;
@@ -4092,7 +2884,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 lecternStash.keySet())) {
             Map<BlockPos, NBTTagCompound> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, NBTTagCompound> lecterns = drainChunkHolders(lecternStash, pos);
-            prepareDrainedItems(containers); // scrub and on-sight map remap, exactly as the buffered drain does
+            prepareDrainedItems(containers);
             activeWriter.submitChunkRewrite(dimension, pos, onDisk -> {
                 MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, pos, containerSink,
                         lecternSink, containers, lecterns);
@@ -4102,12 +2894,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Pack at most one closed holder per tick to its gzip bytes, oldest first, skipping the open menu's bound positions
-     * (still last-seen-wins overwritten). Without this the stash retains every not-yet-flushed holder as a full tag
-     * tree, which a dense storage-room session grows to hundreds of megabytes of heap; one holder per tick bounds the
-     * pack cost while still outpacing any human open rate.
-     */
     private void compactClosedStashHolders() {
         if (!compactOneStashHolder(containerStash)) {
             compactOneStashHolder(lecternStash);
@@ -4124,16 +2910,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 holder.compact();
                 return true;
             } catch (IOException e) {
-                // Unreachable in practice: the pack writes to a memory stream. The holder keeps its live
-                // tree and retires itself from packing, so this warns once per holder and the pump moves on
-                // to the next candidate rather than head-of-line blocking on a permanent failure.
                 LOGGER.warn("failed to pack stashed container {}; it stays live in memory", entry.getKey(), e);
             }
         }
         return false;
     }
 
-    /** Whether {@code posKey} is a bound position of the currently-open menu (either double-chest half). */
     private boolean isBoundOpen(long posKey) {
         OptionalLong bound = association.boundPos();
         if (bound.isPresent() && bound.getAsLong() == posKey) {
@@ -4143,20 +2925,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return secondary.isPresent() && secondary.getAsLong() == posKey;
     }
 
-    /**
-     * Stream the accumulated entities: drain each flush-eligible entity-chunk to the {@code entities/} target, the
-     * entity analog of the terrain keep-hot flush, so the buffer stays bounded as the player roams. Driven by
-     * flush-eligibility, not by the terrain buffer, so an entity in an already-flushed chunk still drains. The
-     * {@code allCaptured} privacy gate is enforced at accumulation, so every buffered entity is in a chunk whose
-     * terrain we captured.
-     */
     private void flushEntityBuffer(AsyncSaveWriter activeWriter, boolean all, int centerX, int centerZ,
             int keepHot) {
         if (entityBuffer.isEmpty()) {
             return;
         }
-        prepareEntityContainers(); // scrub + map-remap any new vehicle holders once, before the merge drains them
-        prepareMerchantHolders(); // and the merchant offer holders, on the same once-per-holder discipline
+        prepareEntityContainers();
+        prepareMerchantHolders();
         for (ChunkPos pos : entityBuffer.bufferedChunks()) {
             if (all || FlushPolicy.shouldFlush(pos.chunkXPos, pos.chunkZPos, centerX, centerZ, keepHot)) {
                 flushEntityChunk(activeWriter, pos);
@@ -4164,29 +2939,21 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Drain one entity-chunk: build the envelope, fold in the vehicle containers, remap framed maps, submit.
-     * Package-private so the entity-container and map-remap tallies it feeds stay testable; its only production caller
-     * is the entity flush pump.
-     */
     void flushEntityChunk(AsyncSaveWriter activeWriter, ChunkPos pos) {
         List<NBTTagCompound> tags = entityBuffer.drainChunk(pos);
-        dropExcludedRootVehicles(tags); // a mount captured into RootVehicle is not also written standalone
+        dropExcludedRootVehicles(tags);
         if (tags.isEmpty()) {
             return;
         }
         try {
             NBTTagCompound envelope = adapter.entitySink().encodeChunk(tags, pos);
             if (envelope == null) {
-                // A null envelope drops the whole drained chunk; log it and count the loss by source so it
-                // cannot read as written.
                 LOGGER.warn("skipping {} entities for chunk {}: the entity sink returned no envelope",
                         tags.size(), pos);
                 countEntityFlushDrop(tags);
                 return;
             }
-            // Before any fold: an invented list fills the slot both carry-forwards need empty, for the reason
-            // MerchantOfferScrub states in full.
+            // Before any fold: an invented list fills the slot both carry-forwards need empty.
             inventedMerchantOffersDropped += MerchantOfferScrub.stripInventedOffers(envelope);
             entityContainersFailed += EntityContainerMerge.refoldFlushedContainers(adapter.containerSink(),
                     envelope, foldedContainerVehicles, entityContainerStash).failed();
@@ -4195,9 +2962,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     envelope, entityContainerStash);
             mergedEntityContainers += entityTally.merged();
             entityContainersFailed += entityTally.failed();
-            // The merchant siblings, same refold-then-record-then-merge order. The refold re-writes trades onto a
-            // second chunk copy for its side effect only, so its count is not summed; the fold cannot fail, so
-            // there is no failed term to add.
             EntityContainerMerge.refoldFlushedMerchants(envelope, foldedMerchants, merchantStash);
             recordStandaloneFoldedMerchants(tags);
             mergedVillagerTrades += EntityContainerMerge.mergeMerchantStash(envelope, merchantStash).merged();
@@ -4209,7 +2973,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 remapEntityItems(envelope, archive);
             }
             activeWriter.submitEntity(targetDimension, pos, envelope);
-            countEntitiesSubmitted(tags); // tally writes here, at successful submit, not at buffer time
+            countEntitiesSubmitted(tags);
         } catch (RuntimeException e) {
             LOGGER.warn("skipping {} entities for chunk {}: encode/merge failed", tags.size(), pos, e);
             countEntityFlushDrop(tags);
@@ -4218,8 +2982,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Retain the holder of every container vehicle in this drained chunk whose captured contents are about to be folded
-     * into the standalone entity write, keyed by UUID, before {@code mergeEntityStash} drains the stash. A reopened
-     * menu replaces the retained holder here with its fresher capture.
+     * into the standalone entity write, keyed by UUID, before {@code mergeEntityStash} drains the stash.
      */
     private void recordStandaloneFoldedContainers(List<NBTTagCompound> tags) {
         for (NBTTagCompound tag : tags) {
@@ -4241,11 +3004,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The merchant analog of {@link #recordStandaloneFoldedContainers}: retain a copy of each about-to-drain offer
-     * holder for a villager written standalone in this chunk, so {@link EntityContainerMerge#refoldFlushedMerchants}
-     * can re-apply it to another chunk copy (a wandering trader that crossed entity-chunks). The copy is marked
-     * prepared, since it is a copy of an already-scrubbed, already-remapped holder the non-idempotent remap must not
-     * re-run.
+     * The copy is marked prepared, since it is a copy of an already-scrubbed, already-remapped holder the
+     * non-idempotent remap must not re-run.
      */
     private void recordStandaloneFoldedMerchants(List<NBTTagCompound> tags) {
         for (NBTTagCompound tag : tags) {
@@ -4262,16 +3022,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Drop from a drained entity-chunk any UUID captured into the player's RootVehicle this finish, so a primed or
-     * reconstructed mount is not also written standalone (a same-UUID clash on load). {@code drainChunk} returns a
-     * fresh mutable list, so the {@code removeIf} is safe; the source tally is dropped too, since a filtered mount is
-     * player-state, not a standalone write. The set is empty until finish, so mid-session flushes are untouched. A
-     * primed mount already flushed to disk before finish cannot be retracted here; that is the accepted UUID-collision
-     * residual, and it self-heals only when both copies land in one level: a mount the player rode into another
-     * dimension leaves a copy behind that no load can drop, which is a standing residual of this path rather than
-     * something it handles.
-     */
     private void dropExcludedRootVehicles(List<NBTTagCompound> tags) {
         if (excludedRootVehicleUuids.isEmpty()) {
             return;
@@ -4286,12 +3036,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         });
     }
 
-    /** Tally each submitted entity to its write counter by the source recorded when it was buffered. */
     private void countEntitiesSubmitted(List<NBTTagCompound> tags) {
         for (NBTTagCompound tag : tags) {
             UUID uuid = EntityMerge.readUuid(tag);
             if (uuid == null) {
-                continue; // every live-encoded tag carries a UUID; defensive, matches EntityContainerMerge
+                continue;
             }
             if (bufferedEntitySources.remove(uuid) == EntitySource.PRIMED) {
                 primedEntitiesWritten++;
@@ -4301,11 +3050,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Count a whole entity-chunk lost during flush (its encode/merge threw, or the sink returned no envelope) by the
-     * source of each drained entity, so the loss shows in the reconciliation rather than over-reported as written. The
-     * drained tags are already removed from the buffer; the caller logs the chunk.
-     */
     private void countEntityFlushDrop(List<NBTTagCompound> tags) {
         for (NBTTagCompound tag : tags) {
             UUID uuid = EntityMerge.readUuid(tag);
@@ -4317,11 +3061,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Scrub the item-borne coordinates and on-sight map-remap each captured vehicle/animal container holder, exactly
-     * once per holder (tracked by identity), before {@link EntityContainerMerge} folds it into its entity tag, via the
-     * shared {@link #scrubAndRemapItems} sanitization.
-     */
     private void prepareEntityContainers() {
         for (Map.Entry<UUID, NBTTagCompound> entry : entityContainerStash.entrySet()) {
             if (preparedEntityContainers.add(entry.getValue())) {
@@ -4330,18 +3069,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Scrub the sell items' coordinates and on-sight map-remap each captured merchant offer holder, exactly once per
-     * holder (tracked by identity), before {@link EntityContainerMerge} folds it onto its villager tag. The scrub and
-     * remap can throw (the map archive's on-sight image stream is a live IO path), so a throwing holder is isolated the
-     * same way the item path isolates a framed map: the villager's trades save without the sanitize this holder needed,
-     * the loss is tallied, and the download reads partial.
-     */
     private void prepareMerchantHolders() {
         MapArchive archive = this.mapArchive;
         for (Map.Entry<UUID, NBTTagCompound> entry : merchantStash.entrySet()) {
             if (!preparedMerchantHolders.add(entry.getValue())) {
-                continue; // already scrubbed and remapped once; the map remap is not idempotent
+                continue;
             }
             try {
                 MerchantOfferCapture.scrubAndRemapOffers(entry.getValue(), !config.saveItemCoordinates(), archive);
@@ -4353,26 +3085,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Serialize one entity to its standalone entity tag, reusing the per-band {@link EntitySink}: encode a singleton
-     * chunk and lift the one element. Returns null two ways and tallies which of the two it was against {@code source},
-     * because only one of them is a loss. The throw is caught for per-entity failure isolation: an entity can carry
-     * state the vanilla save codec rejects and we cannot always pre-sanitize it, so one entity is skipped rather than
-     * crashing the download.
-     *
-     * <p>The sink refusing the entity is not: it drops a live passenger that saves nested under its vehicle instead, a
-     * removed entity, a vehicle carrying exactly one player, and a non-serializable type, all of which vanilla also
-     * skips, so that path feeds only the reported skip tally. An encode that throws, or an envelope that comes back
-     * without the entity the sink was willing to write, loses one, so those feed the structural loss the finish verdict
-     * reads. Conflating the two would make either an unmountable donkey report a partial download or a lost entity
-     * report a clean one, depending on which way the shared counter was read.
-     *
-     * <p>One refusal is a loss anyway and is knowingly left in the skip tally: vanilla's one-player-vehicle gate counts
-     * any player, not only the local one, and it persists such a mount through that player's own data, which a download
-     * carrying no other player's data does not reproduce. So a remote player's mount, loaded before the download began
-     * and never re-announced, is refused here and reports clean. Separating it needs a signal this method does not
-     * have, since the sink returns the same empty envelope either way.
-     *
-     * <p>Package-private so the split it makes stays testable.
+     * Returns null two ways and tallies which of the two it was against {@code source}, because only one of them is a
+     * loss. The throw is caught for per-entity failure isolation: an entity can carry state the vanilla save rejects
+     * and we cannot always pre-sanitize it, so one entity is skipped rather than crashing the download.
      */
     @Nullable
     NBTTagCompound encodeSingleEntity(Entity entity, ChunkPos pos, EntitySource source) {
@@ -4395,15 +3110,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (entities != null && !entities.hasNoTags() && entities.get(0) instanceof NBTTagCompound) {
             return (NBTTagCompound) entities.get(0);
         }
-        // A non-null envelope means the sink did save this entity, so failing to lift it back out loses one it
-        // was willing to write. That is a band sink defect rather than one of the refusals above, so it counts
-        // as the loss it is.
+        // A non-null envelope means the sink did save this entity, so failing to lift it back out loses one it was
+        // willing to write.
         recordEntityEncodeFailure(source);
         LOGGER.warn("skipping entity {}: the entity sink returned an envelope without it", entity.getUniqueID());
         return null;
     }
 
-    /** Tally one entity the encode, a malformed envelope, or the finish re-offer destroyed, against its path. */
     private void recordEntityEncodeFailure(EntitySource source) {
         if (source == EntitySource.PRIMED) {
             primeEncodeFailures++;
@@ -4412,7 +3125,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** Tally one entity the sink refused (no loss) against the path that was capturing it. */
     private void recordEntitySinkSkip(EntitySource source) {
         if (source == EntitySource.PRIMED) {
             primeSinkSkips++;
@@ -4422,21 +3134,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Reconstruct and buffer the accumulated entities whose chunk is ready to write. An entity is held in the packet
-     * accumulator independent of unload, then taken a whole chunk at a time as that chunk leaves the keep-hot window;
-     * {@code pass} says which drain this is and, with it, what may be thrown away (see {@link PromotePass}).
-     *
-     * <p>Only the bound dimension's entities are touched, at every step: the chunk keys, the privacy-gate test against
+     * Only the bound dimension's entities are touched, at every step: the chunk keys, the privacy-gate test against
      * them, and the drain. A chunk key means nothing outside the dimension it was announced in, so comparing one from
      * another dimension against this dimension's captured positions decides the fate of an entity by a coincidence of
-     * numbers, in the direction of writing it into the wrong world's folder. The captured-chunk privacy gate is
-     * enforced here: an entity whose terrain we have not captured is left held (it may still be captured, on this visit
-     * or a later one), and only the finish drops it unwritten. The budget is checked per chunk on the per-tick pass, so
-     * a drained chunk is always encoded whole and a spill defers the remaining chunks safely (an entity cannot unload
-     * out from under the deferral). Runs on the main thread (it builds entities against the live level).
+     * numbers, in the direction of writing it into the wrong world's folder. The budget is checked per chunk on the
+     * per-tick pass, so a drained chunk is always encoded whole and a spill defers the remaining chunks safely (an
+     * entity cannot unload out from under the deferral).
      */
-    // Package-private so the pass distinction, which decides whether a refused entity is held or dropped,
-    // stays testable without a client.
     void promotePacketEntities(PromotePass pass, int centerX, int centerZ, int keepHot) {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
@@ -4448,65 +3152,40 @@ public final class LiveCaptureSession implements CaptureController.Session {
             ChunkPos pos = new ChunkPos((int) chunkKey, (int) (chunkKey >> 32));
             if (pass == PromotePass.KEEP_HOT
                     && !FlushPolicy.shouldFlush(pos.chunkXPos, pos.chunkZPos, centerX, centerZ, keepHot)) {
-                continue; // still near the player: hold it, it has not left the keep-hot window yet
+                continue;
             }
             if (!allCaptured.contains(chunkKey)) {
                 if (pass != PromotePass.FINISH) {
-                    // The captured-chunk privacy gate: we never write an entity in a chunk whose terrain we have
-                    // not captured, so hold it and drop it unwritten only at finish, which is the only pass with
-                    // no later one behind it. The dimension's captured positions persist for the whole session
-                    // and are restored by the rebind on a return trip, so a chunk captured on a second visit
-                    // still writes what was held from the first. This cannot grow into an unbounded uncaptured
-                    // tail: vanilla broadcasts an entity only for a chunk already in the client tracking view,
-                    // the same chunks terrain is sent for (ChunkMap.updatePlayer gates on isChunkTracked), so a
-                    // packet arrives for an uncaptured chunk only transiently, while capture is budget-starved
-                    // on a fast flight, and that self-heals once movement slows.
+                    // The captured-chunk privacy gate: we never write an entity in a chunk whose terrain we have not
+                    // captured, so hold it and drop it unwritten only at finish, which is the only pass with no later
+                    // one behind it. The dimension's captured positions persist for the whole session and are restored
+                    // by the rebind on a return trip, so a chunk captured on a second visit still writes what was held
+                    // from the first.
                     continue;
                 }
                 droppedUncaptured += capture.dropChunk(liveDimensionId, chunkKey).size();
                 continue;
             }
             if (pass == PromotePass.KEEP_HOT && !hasEncodeBudget()) {
-                break; // budget spent; the accumulator holds the rest safely for a later tick
+                break;
             }
             promoteChunk(pos, capture.dropChunk(liveDimensionId, chunkKey));
         }
     }
 
-    /**
-     * Which pass is draining the accumulator. The three differ in what they may write and, more importantly, in what
-     * they may throw away: only {@link #FINISH} has no later pass behind it, so only it may turn a privacy-gate refusal
-     * into a drop.
-     */
     enum PromotePass {
-        /** The per-tick pass: distance-gated and budgeted, holding everything it may not write. */
         KEEP_HOT,
-        /**
-         * The dimension rebind: every chunk of the dimension being left, ignoring distance and the budget because the
-         * next tick would reconstruct against another world, but still holding what the privacy gate refuses, since
-         * this session can write it on a return trip; with no return trip the finish settles it against that
-         * dimension's own captured positions.
-         */
         LEAVING_DIMENSION,
-        /** The finish: every chunk, ignoring distance and the budget, dropping and counting what it cannot write. */
         FINISH
     }
 
-    /**
-     * Reconstruct one drained chunk's entities, wire the relationships that need sibling entities (passengers nest
-     * under their vehicle, a leash links to its holder), then encode each root entity. Passengers and leash holders are
-     * resolved within this chunk's batch by their int id: the accumulator re-homes a vehicle's riders to its chunk so
-     * they drain here together, and an unresolved holder leaves the link unset (the entity is still saved). A wired
-     * passenger saves nested in its vehicle's tag, so it is skipped standalone and is not counted (it reaches disk
-     * inside the vehicle).
-     */
     private void promoteChunk(ChunkPos pos,
             List<PacketEntity<Packet<?>, EntityDataManager.DataEntry<?>, EquipmentEntry>> held) {
         List<Promoted> built = new ArrayList<>();
         Map<Integer, Entity> byId = new HashMap<>();
         for (PacketEntity<Packet<?>, EntityDataManager.DataEntry<?>, EquipmentEntry> frame : held) {
             if (excludedRootVehicleUuids.contains(frame.uuid())) {
-                continue; // captured into the player's RootVehicle; not also a standalone entity (same-UUID clash)
+                continue;
             }
             Entity entity;
             try {
@@ -4522,46 +3201,42 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 built.add(new Promoted(frame, entity));
                 byId.put(frame.id(), entity);
             } else {
-                createDrops++; // the typed entity could not be created
+                createDrops++;
             }
         }
         for (Promoted promoted : built) {
             for (int riderId : promoted.frame().passengers()) {
                 Entity rider = byId.get(riderId);
                 if (rider != null) {
-                    rider.startRiding(promoted.entity(), true); // the vehicle's save then nests the rider
+                    rider.startRiding(promoted.entity(), true);
                 }
             }
             if (promoted.frame().leashHolderId() != 0 && promoted.entity() instanceof EntityLiving) {
                 EntityLiving mob = (EntityLiving) promoted.entity();
                 Entity holder = byId.get(promoted.frame().leashHolderId());
                 if (holder != null) {
-                    mob.setLeashedToEntity(holder, false); // saved as the holder's UUID, or a fence knot's block pos
+                    mob.setLeashedToEntity(holder, false);
                 }
-                // A holder in a different drained chunk is not resolved here (resolution is within this batch by
-                // int id), so a cross-chunk leashed mob saves unleashed, the leash sibling of the
-                // cross-chunk rider edge. The mob is still saved, only the link is lost.
             }
         }
         for (Promoted promoted : built) {
             Entity entity = promoted.entity();
             if (entity.isRiding()) {
-                nestedPassengers++; // saved nested in its vehicle's tag, a received spawn that is not a written root
+                nestedPassengers++;
                 continue;
             }
             if (shouldSaveEntity(entity)) {
-                reportCounts.addEntity(promoted.frame().uuid()); // dedup-by-UUID
+                reportCounts.addEntity(promoted.frame().uuid());
             }
             NBTTagCompound tag = encodeSingleEntity(entity, pos, EntitySource.RECONSTRUCTED);
             if (tag != null) {
                 entityBuffer.accumulate(promoted.frame().uuid(), pos, tag);
-                bufferedEntitySources.put(promoted.frame().uuid(), EntitySource.RECONSTRUCTED); // counted at submit
+                bufferedEntitySources.put(promoted.frame().uuid(), EntitySource.RECONSTRUCTED);
                 recordSaved(promoted.frame().uuid(), entity);
             }
         }
     }
 
-    /** A drained entity paired with the entity reconstructed from it, for the in-batch relationship wiring. */
     private static final class Promoted {
         private final PacketEntity<Packet<?>, EntityDataManager.DataEntry<?>, EquipmentEntry> frame;
         private final Entity entity;
@@ -4581,25 +3256,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Rebuild a live entity from its accumulated packet state, the way the client does on each spawn packet then the
-     * post-spawn packets: create the typed entity against the live level (an object, mob, painting, or experience orb,
-     * each built as its client handler builds it, so a hanging entity gets its block pos and facing here), snap it to
-     * its last known position (the accumulated move/teleport/position-sync, so a mob saves where it ended), assign the
-     * merged synced values, and set the merged equipment per slot. Passengers and the leash are wired by
-     * {@link #promoteChunk} once the sibling entities exist. The result is a fresh, never-removed entity
-     * {@link EntitySink} saves like any other. Returns null if the type cannot create.
-     */
     private @Nullable Entity reconstructPacketEntity(
             PacketEntity<Packet<?>, EntityDataManager.DataEntry<?>, EquipmentEntry> frame) {
-        // This band splits a non-player spawn across several packets; createSpawnEntity dispatches on the concrete one
-        // the way the vanilla client handlers do (see EntityPacketCapture).
         Entity entity = EntityPacketCapture.createSpawnEntity(frame.spawn(), level());
         if (entity == null) {
             return null;
         }
-        // This band has no Entity.recreateFromPacket; set the id and uuid from the accumulated identity (the moveTo
-        // below sets position and rotation), which is the identity the reconstructed entity is saved under.
         entity.setEntityId(frame.id());
         entity.setUniqueId(frame.uuid());
         EntityPos pos = frame.pos();
@@ -4618,10 +3280,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Scrub and map remap a drained {@code "Items"} holder bundle (the open-time containers and the confirmed
-     * place/insert holders) before it joins the writer-bound submit: a holder can carry a lodestone compass or a filled
-     * map, and an un-remapped map id would collide with an archive id and render the wrong map. Called only on holders
-     * that will merge, never on a still-stashed one, so the non-idempotent remap runs exactly once per holder.
+     * Called only on drained holders, never on a still-stashed one, so the non-idempotent remap runs exactly once per
+     * holder.
      */
     private void prepareDrainedItems(Map<BlockPos, NBTTagCompound> holders) {
         for (Map.Entry<BlockPos, NBTTagCompound> entry : holders.entrySet()) {
@@ -4629,13 +3289,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Scrub the item-borne coordinates and on-sight {@link MapArchive#remap} a captured container holder's
-     * {@code "Items"}, the shared container sanitization the open-time, placed-container, and entity-container paths
-     * run. {@link ItemLocationScrub} is null-safe and total, so the scrub cannot throw; the remap is per-holder
-     * fail-soft, so a serialize bug renders that one map blank rather than aborting the flush. {@code identifier}
-     * labels the holder in the loss line.
-     */
     private void scrubAndRemapItems(NBTTagCompound holder, Object identifier) {
         if (!config.saveItemCoordinates()) {
             ItemLocationScrub.scrub(holder, "Items");
@@ -4651,12 +3304,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Tally each confirmed interaction-prediction merge to the dedup-correct report counter, the way open-time merges
-     * tally, keyed by pos so each container counts once. Every confirmed merge counts here at confirm (flush) time, so
-     * its live count lags until the chunk roams out of the hot window. A bookshelf is the exception: it is counted live
-     * at full-cycle ({@link #onBookshelfSlotCaptured}) and skipped here, so a partly-cycled shelf never counts.
-     */
     private void tallyInteractionMerges(Set<BlockPos> items, Set<BlockPos> holders) {
         tallyInteractionPositions(items);
         tallyInteractionPositions(holders);
@@ -4665,18 +3312,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void tallyInteractionPositions(Set<BlockPos> positions) {
         for (BlockPos pos : positions) {
             if (bookshelfSlots.containsKey(pos.toLong())) {
-                continue; // a bookshelf counts live at full-cycle, never here on the any-slot confirm
+                continue;
             }
             reportCounts.addContainer("i:" + pos.toLong());
         }
     }
 
-    /**
-     * Blank item-borne coordinates on every entity in an encoded entity-chunk tag (and their passengers), per the
-     * item-coordinate knob. Walks the encoded chunk's {@code "Entities"} list; {@link ItemLocationScrub#scrubEntity}
-     * recurses each entity's own {@code "Passengers"}, so this stays a flat top-level loop. Runs inside the per-chunk
-     * try.
-     */
     private void scrubEntityItems(NBTTagCompound entityChunkTag) {
         if (!(entityChunkTag.getTag("Entities") instanceof NBTTagList)) {
             return;
@@ -4690,11 +3331,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Remap (and on-sight serialize) the maps of each entity's displayed single {@code "Item"} in an encoded
-     * entity-chunk tag: an item frame's framed map and a dropped item entity's map. Walks the encoded chunk's
-     * {@code "Entities"} list; entities with no {@code "Item"} are skipped. Runs inside the per-chunk try.
-     */
     private void remapEntityItems(NBTTagCompound entityChunkTag, MapArchive archive) {
         if (!(entityChunkTag.getTag("Entities") instanceof NBTTagList)) {
             return;
@@ -4707,9 +3343,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 try {
                     archive.remapItem(item);
                 } catch (RuntimeException e) {
-                    // Per-item fail-soft, the scrubAndRemapItems discipline: a single bad
-                    // framed/dropped map item renders blank rather than throwing out of flushEntityChunk
-                    // and losing the whole already-drained entity-chunk.
+                    // Per-item fail-soft: a single bad framed/dropped map item keeps its unremapped id rather than
+                    // throwing into flushEntityChunk's catch, which drops the whole already-drained entity-chunk.
                     mapsRemapFailed++;
                     mapEntityRemapLoss.lost(EntityMerge.readUuid(entity), e);
                 }
@@ -4717,20 +3352,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** Report the background save's outcome to the player (called on the main thread, once, when it completes). */
     private void report(AsyncSaveWriter.SaveResult result) {
         if (result.failed()) {
             reportSaveFailure(result.error());
             return;
         }
-        // Fallback to the writer-thread finalizer's completion write; idempotent, so at-most-once. Carries the
-        // same soft tally so a fallback write stamps the same clean-or-partial status the finalizer would.
         writeReportCompletion(result.chunksFailed(), result.entityChunksFailed());
         int failed = failedWriteCount(result.chunksFailed(), result.entityChunksFailed());
         boolean partial = failed > 0;
-        // The chat figures are the dedup'd counts the HUD and downloads screen show: the distinct captured-chunk
-        // total, not the writer's new-plus-re-captured write tally, which double-counts a chunk written once then
-        // re-flushed on a revisit. The merge fold below stays log-only diagnostics (it overcounts).
+        // The chat figures are the dedup'd counts the HUD shows: the distinct captured-chunk total, not the writer's
+        // new-plus-re-captured write tally, which double-counts a chunk written once then re-flushed on a revisit.
         int distinctChunks = totalCapturedChunks();
         int containers = mergedContainers + mergedEntityContainers + result.mergedContainers();
         if (config.showChatMessages()) {
@@ -4761,8 +3392,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 mapManifestLosses(), blockContainersFailed, entityContainersFailed, containerVehiclesLost,
                 villagerTradesLost, interactionCapturesLost, structuralEntitiesLost, resumedMountsLost,
                 playerRecordsLost, finishStepsFailed);
-        // The destination the toast names is the export zip when one was actually written (the shareable copy),
-        // else the openable folder; zipFileName is null on a zip failure, so the toast never names a missing zip.
         String zipFileName = result.zipFileName();
         ToastCopy toast;
         if (partial && zipFileName != null) {
@@ -4779,7 +3408,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** Surface a failed save in chat, the log, and the error toast, all carrying the same message. */
     private void reportSaveFailure(@Nullable Throwable error) {
         SaveFailureReason reason = SaveFailureComposer.describe(error);
         bridge.sendChat(ChatCopy.saveFailed(reason)); // an error is never suppressed by showChatMessages
@@ -4790,21 +3418,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /**
-     * Stamp the download report's identity and settings diff into the save folder before the save begins, marking the
-     * folder as wdl-managed. Runs once at world-open ({@link #ensureWriter}) and writes only the crash sentinel; the
-     * human rendering follows from the writer preflight, after the pre-resume backup, so the backup archives the prior
-     * session's download.md. The store is fail-soft, so a report write failure never blocks the save.
-     */
     private void beginReport(Minecraft minecraft, Path saveRoot) {
         stampReport(saveRoot, () -> buildReportIdentity(minecraft), () -> buildReportEnvironment(minecraft));
     }
 
     /**
-     * Stamp the report from the supplied facts, degrading either read that throws rather than propagating. Never
-     * throwing is the contract: the stamp writes the sentinel that marks a folder a wdl download, so a propagated read
-     * failure leaves a fully written save neither listed nor resumable. Package-private so that guarantee is
-     * headless-testable.
+     * Never throwing is the contract: the stamp writes the sentinel that marks a folder a wdl download, so a propagated
+     * read failure leaves a fully written save neither listed nor resumable.
      */
     void stampReport(Path saveRoot, Supplier<DownloadIdentity> readIdentity,
             Supplier<ReportEnvironment> readEnvironment) {
@@ -4828,10 +3448,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         report.begin(saveRoot, identity, environment, config.nonDefaultSettings());
     }
 
-    /**
-     * The report identity for a download whose MC-side facts could not be read. Package-private so the fields that must
-     * stay real, rather than degrade, are headless-testable.
-     */
     DownloadIdentity unidentifiedIdentity() {
         String worldName = target.worldName();
         return new DownloadIdentity(UUID.randomUUID().toString(), Instant.now().truncatedTo(ChronoUnit.SECONDS),
@@ -4839,25 +3455,21 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 worldName != null ? worldName : "", "unidentified");
     }
 
-    /** The report environment for a download whose MC-side facts could not be read. */
     private ReportEnvironment unidentifiedEnvironment() {
         return new ReportEnvironment("", 0, targetDimension.getName().toString(), Wdl.mcVersion(),
                 bridge.modVersion());
     }
 
-    /** Read the MC-side environment facts (server brand, simulation distance, dimension, MC + mod version). */
     private ReportEnvironment buildReportEnvironment(Minecraft minecraft) {
         String brand = "";
         EntityPlayerSP player = minecraft.player;
         if (player != null && player.getServerBrand() != null) {
             brand = player.getServerBrand();
         }
-        // 1.10.2 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
         return new ReportEnvironment(brand, minecraft.gameSettings.renderDistanceChunks,
                 targetDimension.getName().toString(), Wdl.mcVersion(), bridge.modVersion());
     }
 
-    /** Read the few MC-side identity facts (downloader, source, loader) into the MC-free report identity. */
     private DownloadIdentity buildReportIdentity(Minecraft minecraft) {
         String downloaderName = "";
         String downloaderUuid = "";
@@ -4884,21 +3496,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 bridge.loaderVersion(), downloadName, sourceKind);
     }
 
-    /**
-     * Freeze the chunk, entity, and container counts at the end-of-capture moment into {@link #pendingReport}. The
-     * container and entity counts were accumulated during capture; the chunks are fed here from the retained position
-     * set.
-     */
     private void prepareReportCompletion() {
         Path root = reportRoot;
         DownloadIdentity identity = reportIdentity;
         ReportEnvironment environment = reportEnvironment;
         if (root == null || identity == null || environment == null) {
-            return; // the report never began (defensive: ensureWriter stamps it before finish reaches here)
+            return;
         }
-        // Build the per-dimension breakdown straight from the already-deduped position sets: each dimension
-        // keeps its own DimensionType identity and its own count, so a shared packed position in two dimensions
-        // counts once in each, as it should.
         List<DimensionChunks> dimensions = new ArrayList<>();
         int chunkTotal = 0;
         for (Map.Entry<DimensionType, LongOpenHashSet> dimension : capturedByDimension.entrySet()) {
@@ -4911,19 +3515,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 chunkTotal, reportCounts.entityCount(), reportCounts.containerCount(), dimensions);
     }
 
-    /**
-     * Write the download report's completion record once, the authoritative finish marker. Reachable from the
-     * writer-thread finalizer (the clean-finish path) and again from the main-thread {@link #report} fallback;
-     * {@link DownloadReportStore#complete} is idempotent and fail-soft, so exactly one record results and a report
-     * write failure never corrupts the save. The save-chunk scan is handed over lazily and runs after the final drain,
-     * so it sees every flushed region write and the store's at-most-once latch keeps it from running twice.
-     */
     private void writeReportCompletion(int chunksFailed, int entityChunksFailed) {
         PendingReport pending = pendingReport;
         if (pending == null) {
-            return; // nothing began, or finish() returned early before freezing the counts
+            return;
         }
-        WorldIconWriter.write(pending.saveRoot(), reportIconBytes); // bytes were snapshotted on the main thread
+        WorldIconWriter.write(pending.saveRoot(), reportIconBytes);
         report.complete(pending.saveRoot(), pending.identity(), pending.environment(), pending.settings(),
                 pending.finishedAt(), new DownloadCounts(pending.chunks(), pending.entities(),
                         pending.containers(), pending.dimensions()),
@@ -4931,10 +3528,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The in-save chunk totals at this finish instant, from the on-disk region headers; empty without paths. The catch
-     * is the supplier-boundary backstop: a scan failure of any kind degrades to a zero total (which the report and the
-     * screen row both render as a session-counts fallback) rather than reaching the store's catch and costing the
-     * completion record of a fully-written download.
+     * The catch is the supplier-boundary backstop: a scan failure of any kind degrades to a zero total rather than
+     * reaching the store's catch and costing the completion record of a fully-written download.
      */
     private SaveChunks scanSaveChunks() {
         try {
@@ -4949,28 +3544,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Whether this download lost anything a tally counted, so the finish is partial rather than clean. Sums the
-     * writer's chunk and entity-chunk tally (from the finalize step or {@link AsyncSaveWriter.SaveResult}) and the
-     * session's own fail-soft tallies (throwing chunk snapshots, map writes and remaps, the finalize-time idcounts
-     * write, the map-id manifest, block and vehicle container merges, unrecovered opened vehicles, unwritten
-     * interaction predictions, structural entity drops, an unplaceable resumed mount, a player record no live client
-     * was left to read, and the degraded finish-time steps). Heterogeneous units, honest only as a rough magnitude; the
-     * log carries the breakdown.
+     * A zero is not proof a download lost nothing. Losses reach this sum only where a term was added for them, so read
+     * a zero as "no counted term moved" and never as "nothing was lost", and do not add a caller that treats it as an
+     * assertion of completeness.
      *
-     * <p>A zero is not proof a download lost nothing. Losses reach this sum only where a term was added for them, so
-     * read a zero as "no counted term moved" and never as "nothing was lost", and do not add a caller that treats it as
-     * an assertion of completeness. Several classes escape it by construction: a loss whose size its own catch cannot
-     * see, one that happens at a write rather than at the capture this sum counts, and one dropped before anything
-     * holds it. Whether any given loss has a term is answered by reading the terms, not by trusting a list here to be
-     * current.
-     *
-     * <p>Those tallies accrue on two threads: map data writes, the idcounts write and block-container merges land on
-     * the writer thread, the manifest record on either (the world-open scheme signal runs on the main thread, the
-     * finalize rewrite on the writer's), and the rest on the main thread. Only the map tally is atomic, and the plain
-     * ints beside it are correct for the production readers because each sits behind the writer's queue drain or its
-     * completed future, not because they are single-threaded. A reader added outside those edges must supply its own,
-     * or establish that no writer thread ever ran for the session it reads. Package-private so the verdict the
-     * completion record stamps stays testable.
+     * <p>Only the map tally is atomic, and the plain ints beside it are correct for the production readers because each
+     * sits behind the writer's queue drain or its completed future, not because they are single-threaded. A reader
+     * added outside those edges must supply its own, or establish that no writer thread ever ran for the session it
+     * reads.
      */
     boolean isPartialSave(int chunksFailed, int entityChunksFailed) {
         return failedWriteCount(chunksFailed, entityChunksFailed) > 0;
@@ -4985,9 +3566,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Every counted loss that actually moved, by axis, in the order the finish's own breakdown line names them. Empty
-     * means no counted term moved, never that nothing was lost. The keys reach the completion record verbatim, so they
-     * are as durable as it is.
+     * The keys reach the completion record verbatim, so they are as durable as it is.
      */
     private Map<String, Integer> countedLosses(int chunksFailed, int entityChunksFailed) {
         Map<String, Integer> losses = new LinkedHashMap<>();
@@ -5016,7 +3595,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** The completion inputs frozen at end-of-capture, immutable so they cross to the writer thread safely. */
     private static final class PendingReport {
         private final Path saveRoot;
         private final DownloadIdentity identity;

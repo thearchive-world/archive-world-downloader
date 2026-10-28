@@ -33,20 +33,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The MC-typed, loader-agnostic recognizer for interaction-prediction capture: content the chunk packet and an opened
- * menu never carry to the client (a jukebox disc) is predicted from the local player's own right-click and reconciled
- * against the authoritative synced block-state before it is persisted, so a prediction the server never confirmed is
- * never written.
- *
- * <p>Mirrors {@link EntityPacketCapture}: a connection-scoped {@code static volatile} publication point the per-loader
- * use-block hook resolves (the hook has no session reference), {@code null} when no download is running so the hook
- * no-ops. At the click ({@link #onUseBlock}, client main thread) it serializes the hand content to immutable NBT at
- * once (the snapshot discipline), so the stashes hold only detached data; the session drains them per chunk at flush
- * ({@link #drainChunk}), reconciling each candidate against the captured snapshot's block-state ({@link #confirm},
- * {@link #blockStateAt}) and routing the confirmed holders to their merge ({@link ContainerMerge}). At most one capture
- * runs at a time, so a process singleton is correct.
- */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogManager.getLogger(InteractionCapture.class);
 
@@ -56,81 +42,43 @@ public final class InteractionCapture {
 
     /**
      * Whether the recognizer is live, coupled to {@code recaptureChunks}: the reconcile gate confirms a candidate only
-     * against a re-captured, post-interaction block-state, so without re-capture every candidate (insert or place)
-     * fails the gate and is silently discarded. Record nothing in that combination rather than stash a doomed
-     * candidate.
+     * against a post-interaction block-state, so without re-capture a candidate in an already-captured chunk fails the
+     * gate and is silently discarded. Record nothing in that combination rather than stash a doomed candidate.
      */
     private final boolean recaptureEnabled;
 
     /**
      * The per-chunk half of the same rule: whether the chunk an interaction lands in will still be captured, so the
      * gate has a post-interaction block-state to confirm against and a flush to drain the candidate. A chunk already
-     * written and not eligible for re-capture has neither, so a candidate recorded there can only ever be dropped,
-     * while its optimistic mark has already told the outline the content is downloaded.
+     * written and not eligible for re-capture has neither, so a candidate recorded there can only ever be dropped.
      */
     private final ChunkCaptureGate chunkCaptureGate;
 
-    /** Insert-time candidates (jukebox), keyed by the looked-at block pos. Main-thread only. */
     private final Map<BlockPos, Candidate> insertStash = new LinkedHashMap<>();
 
-    /** Place-time candidates, keyed by the derived placed pos. Main-thread only. */
     private final Map<BlockPos, Candidate> placeStash = new LinkedHashMap<>();
 
-    /** Notified the instant a bookshelf book insert is recorded, so the outline marks that slot captured. */
     private final BookshelfSlotSink bookshelfSlotSink;
 
-    /** Notified the instant a content-bearing container is placed, so the outline marks its pos captured. */
     private final PlacedContainerSink placedContainerSink;
 
-    /** Notified with every cell a placement lands in, so the session drops what it captured from the old block. */
     private final PlacementSink placementSink;
 
-    /**
-     * The optimistic-mark callback for the unsaved-container outline: invoked the instant a bookshelf book insert is
-     * recorded, so the session marks that slot captured this session before the flush confirms it, the way the
-     * open-time stash marks a chest captured on open. {@code occupiedMask} is the bookshelf's occupancy before this
-     * insert (the clicked slot is empty pre-click), so the session can tell when the insert completes every occupied
-     * slot and count the bookshelf as a downloaded container.
-     */
     @FunctionalInterface
     interface BookshelfSlotSink {
         void slotCaptured(long posKey, int slot, int occupiedMask);
     }
 
-    /**
-     * The optimistic-mark callback for a placed container, the whole-block sibling of {@link BookshelfSlotSink}:
-     * invoked the instant a content-bearing block is placed, so the session marks its pos captured this session before
-     * the flush confirms it, the way the open-time stash marks a chest on open. Carries the placed block-entity type id
-     * so the session records it alongside the mark, the way the open-time stashes do, letting Gate 2 re-rim the
-     * position if a different container later replaces it.
-     */
     @FunctionalInterface
     interface PlacedContainerSink {
         void containerCaptured(long posKey, String blockTypeId);
     }
 
-    /**
-     * The staleness callback for a landing placement: invoked with the cell a block placement is about to occupy,
-     * whether or not the placed block carries content worth predicting. Every open-time capture the session holds for
-     * that cell describes the block being replaced, and a replacement of the same block-entity type leaves both the
-     * position key and the merge-time type gate matching, so no later signal can tell the stale contents apart from the
-     * new block's. The placement is the client's own evidence that the captured block is gone.
-     *
-     * <p>Raised only for a cell whose chunk will be captured again, which is what makes the captured contents stale.
-     * Where it will not be, the block on disk still predates the placement and the capture still belongs to it. Under
-     * {@code recaptureChunks} OFF no cell qualifies, since that mode gates the whole place path and keeps each area as
-     * first seen.
-     */
     @FunctionalInterface
     interface PlacementSink {
         void blockPlacedAt(long posKey);
     }
 
-    /**
-     * Whether a predicted interaction in {@code chunk} can still reach disk: the session answers from its own buffer
-     * and re-capture mode. Consulted before anything is stashed or optimistically marked, so a chunk the capture will
-     * never look at again produces no candidate and no cleared rim.
-     */
     @FunctionalInterface
     interface ChunkCaptureGate {
         boolean isCapturable(ChunkPos chunk);
@@ -147,7 +95,6 @@ public final class InteractionCapture {
         this.placementSink = placementSink;
     }
 
-    /** Whether an interaction at {@code pos} can still reach disk (both halves of the capturability rule). */
     private boolean isCapturable(BlockPos pos) {
         return recaptureEnabled && chunkCaptureGate.isCapturable(new ChunkPos(pos));
     }
@@ -164,14 +111,12 @@ public final class InteractionCapture {
 
     /**
      * The per-loader use-block hook entry: dispatch one observed right-click to the running recognizer, or no-op when
-     * no download is active or it is not the local player's own client-side interaction (so a future logical-server
-     * pass cannot double-fire). The loaders adapt their event to this one call and never cancel the interaction.
+     * no download is active or it is not the local player's own client-side interaction.
      *
-     * <p>A spectator is excluded, because none of this can happen for one: the server's spectator branch opens a menu
-     * from the block state's provider and never runs the block's use handler, so no insert, no page turn and no jukebox
-     * load occurs. Recording a candidate anyway would clear that block's outline rim and add to the report's container
-     * count for content that never reaches disk, which tells the user the opposite of the truth. The guard is inert on
-     * a loader whose hook already declines to fire for a spectator and load-bearing on one whose hook does not.
+     * <p>A spectator is excluded, because none of this can happen for one: the server's spectator branch opens only a
+     * container block entity's menu and never runs the block's use handler, so no insert and no jukebox load occurs.
+     * The guard is inert on a loader whose hook already declines to fire for a spectator and load-bearing on one whose
+     * hook does not.
      */
     public static void dispatchUseBlock(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
         InteractionCapture capture = active;
@@ -181,14 +126,6 @@ public final class InteractionCapture {
         }
     }
 
-    /**
-     * The kind of a {@link HolderCandidate}, and the one descriptor per holder content type. Each constant carries the
-     * reconcile predicate that confirms its content against the authoritative block-state, and whether its confirmed
-     * holder folds into the open-time {@code "Items"} container bundle (a placed container, which opening supersedes)
-     * or the generic holder merge ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc). Adding a content type
-     * is one constant that drives the gate, {@link #route}, and the merge together, so a half-wired type cannot compile
-     * rather than silently capturing but never writing.
-     */
     enum InteractionKind {
         JUKEBOX(false, state -> state.getBlock() instanceof BlockJukebox && state.getValue(BlockJukebox.HAS_RECORD));
 
@@ -200,25 +137,17 @@ public final class InteractionCapture {
             this.confirm = confirm;
         }
 
-        /** Whether a confirmed holder of this kind folds into the open-time {@code "Items"} bundle. */
         boolean itemsBundle() {
             return itemsBundle;
         }
 
-        /** Whether the authoritative synced {@code state} confirms this kind's predicted content is present. */
         boolean confirms(IBlockState state) {
             return confirm.test(state);
         }
     }
 
-    /** A predicted interaction awaiting the reconcile gate. */
     interface Candidate {}
 
-    /**
-     * A jukebox disc or a placed container: one merge-ready single-key holder ({@code "RecordItem"}/{@code "Items"}).
-     * The gate keeps it whole only when the authoritative block-state confirms the content is present (HAS_RECORD, or
-     * the expected placed block type).
-     */
     static final class HolderCandidate implements Candidate {
         private final InteractionKind kind;
         private final NBTTagCompound holder;
@@ -237,12 +166,6 @@ public final class InteractionCapture {
         }
     }
 
-    /**
-     * A chunk's confirmed holders, split by merge path: {@code items} folds through the open-time container
-     * {@code "Items"} merge (a placed container) under the open-time-wins precedence; {@code holders} takes the generic
-     * field-copy merge (a jukebox disc under {@code "RecordItem"}), each holder already carrying exactly the key its
-     * block entity reads. One bundle drains per chunk.
-     */
     static final class ChunkBundles {
         private final Map<BlockPos, NBTTagCompound> items;
         private final Map<BlockPos, NBTTagCompound> holders;
@@ -261,20 +184,13 @@ public final class InteractionCapture {
         }
     }
 
-    /**
-     * Observe one local-player right-click (client main thread). Recognize an insert into an existing jukebox, snapshot
-     * the hand content to immutable NBT at once, and stash it; the reconcile gate at flush decides whether it survives.
-     * A block placement is recognized too, superseding whatever was captured at the cell it lands in. Never mutates the
-     * interaction or the live stack.
-     */
     private void onUseBlock(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
         recordFailSoft(hit.getBlockPos(), () -> recognize(player, level, hand, hit));
     }
 
     /**
-     * Run {@code recognition} with per-click failure isolation, mirroring the writer-side merge: the click-time encode
-     * can throw on a pathological item whose network form diverges from its persistent form, so isolate it here rather
-     * than letting it escape to the loader event and crash the client mid-download. Skips that one capture and logs.
+     * Run {@code recognition} with per-click failure isolation: the click-time encode can throw, so isolate it here
+     * rather than letting it escape to the loader event and crash the client mid-download.
      */
     void recordFailSoft(BlockPos pos, Runnable recognition) {
         try {
@@ -287,16 +203,15 @@ public final class InteractionCapture {
     private void recognize(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
         @Nullable
         ItemStack stack = player.getHeldItem(hand);
-        // getBlockPos may return a MutableBlockPos; the stash key must be immutable, like every stash.
         BlockPos clicked = hit.getBlockPos().toImmutable();
         IBlockState state = level.getBlockState(clicked);
         boolean inserted = false;
         if (state.getBlock() instanceof BlockJukebox) {
             inserted = recordJukeboxInsert(state, clicked, stack);
         }
-        // A right-click on a jukebox that the block did not consume as an insert (a non-disc, an occupied slot) still
-        // places a held block against that face, so fall through to recordPlace rather than returning: vanilla's use
-        // path yields to item use on a non-consuming result.
+        // A right-click on a jukebox that the block did not consume as an insert (a non-disc) still places a held block
+        // against that face, so fall through to recordPlace rather than returning: vanilla's use path yields to item
+        // use on a non-consuming result.
         if (!inserted && recaptureEnabled) {
             recordPlace(player, hit, stack);
         }
@@ -305,7 +220,7 @@ public final class InteractionCapture {
     boolean recordJukeboxInsert(IBlockState state, BlockPos pos, @Nullable ItemStack stack) {
         if (stack == null || state.getValue(BlockJukebox.HAS_RECORD) || !(stack.getItem() instanceof ItemRecord)
                 || !isCapturable(pos)) {
-            return false; // an occupied jukebox ejects; only a playable disc inserts, and only where it can confirm
+            return false;
         }
         insertStash.put(pos, new HolderCandidate(InteractionKind.JUKEBOX, captureRecordItem(stack)));
         return true;
@@ -330,7 +245,6 @@ public final class InteractionCapture {
                 || !level.canBlockBePlaced(placeBlock, placedPos, false, facing, player, stack)) {
             return;
         }
-        // The stash key must be immutable, like every other stash.
         recordPlaceAt(placedPos.toImmutable(), stack);
     }
 
@@ -343,18 +257,15 @@ public final class InteractionCapture {
         placeStash.remove(placedPos);
         insertStash.remove(placedPos);
         if (!isCapturable(placedPos)) {
-            // The open-time captures are not stale here, and this is the one place that inverts. An
-            // un-capturable cell is one whose chunk is already written and will not be captured again, so the
-            // block entity the residual sweep folds onto is the one on disk, which still predates this
-            // placement. Dropping the holder there would delete a capture that was about to land correctly and
-            // that nothing else can ever write. The predictions above are dropped either way: their reconcile
-            // gate needs a post-interaction snapshot this chunk will never produce.
+            // The open-time captures are not stale here, and this is the one place that inverts. An un-capturable cell
+            // is one whose chunk is already written and will not be captured again, so the block entity the residual
+            // sweep folds onto is the one on disk, which still predates this placement. Dropping the holder there would
+            // delete a capture that was about to land correctly and that nothing else can ever write.
             return;
         }
         placementSink.blockPlacedAt(placedPos.toLong());
     }
 
-    /** The chunks holding a pending candidate, so the session can re-encode the loaded ones before the gate. */
     Set<ChunkPos> pendingCandidateChunks() {
         Set<ChunkPos> chunks = new HashSet<>();
         for (BlockPos pos : insertStash.keySet()) {
@@ -367,11 +278,8 @@ public final class InteractionCapture {
     }
 
     /**
-     * Drop every pending candidate and return where each stood, for a dimension rebind or a finish: whatever is still
-     * stashed after a whole-buffer drain reached no chunk flush, so none of it was written, and the caller counts it as
-     * the loss it is. On a rebind the drop is also mandatory rather than merely honest: an old-dimension candidate's
-     * pos must not carry into the new dimension's shared {@link ChunkPos} space, where a same-type block could merge
-     * wrong-dimension content.
+     * On a rebind the drop is mandatory: an old-dimension candidate's pos must not carry into the new dimension's
+     * shared {@link ChunkPos} space, where a same-type block could merge wrong-dimension content.
      */
     List<BlockPos> drainResidualPositions() {
         List<BlockPos> positions = new ArrayList<>(insertStash.keySet());
@@ -381,14 +289,8 @@ public final class InteractionCapture {
         return positions;
     }
 
-    /**
-     * Drain the candidates located in {@code chunk} from both stashes and reconcile them against the captured
-     * {@code snapshot}, routing each confirmed holder by its merge target. Drains as the chunk leaves memory (the entry
-     * is final and cannot wait), exactly like the open-time stash. Main-thread only.
-     */
     ChunkBundles drainChunk(ChunkPos chunk, ChunkSnapshotSource snapshot) {
         if (insertStash.isEmpty() && placeStash.isEmpty()) {
-            // the common no-interaction flush: skip the per-chunk maps
             return new ChunkBundles(ImmutableMap.of(), ImmutableMap.of());
         }
         Map<BlockPos, Candidate> chunkCandidates = new LinkedHashMap<>();
@@ -408,11 +310,6 @@ public final class InteractionCapture {
         }
     }
 
-    /**
-     * The pure per-chunk reconcile: read each candidate's authoritative block-state off {@code snapshot}, drop a
-     * candidate the gate does not confirm or whose section is missing (fail closed), and route every confirmed holder
-     * by its merge target. Server-free, so the whole drain decision is exercised headless.
-     */
     static ChunkBundles reconcile(Map<BlockPos, Candidate> candidates, ChunkSnapshotSource snapshot) {
         ChunkBundles bundles = new ChunkBundles(new LinkedHashMap<>(), new LinkedHashMap<>());
         for (Map.Entry<BlockPos, Candidate> entry : candidates.entrySet()) {
@@ -427,9 +324,6 @@ public final class InteractionCapture {
     }
 
     private static void route(BlockPos pos, Candidate candidate, NBTTagCompound holder, ChunkBundles bundles) {
-        // The descriptor decides the merge path, so a new content type adds an InteractionKind constant, never a
-        // case here: a holder kind not bound to the "Items" bundle takes the generic field-copy merge, and a kind
-        // bound to it folds into an open-time "Items" holder.
         if (candidate instanceof HolderCandidate && !((HolderCandidate) candidate).kind().itemsBundle()) {
             bundles.holders().put(pos, holder);
         } else {
@@ -437,12 +331,6 @@ public final class InteractionCapture {
         }
     }
 
-    /**
-     * The reconcile gate: keep a predicted candidate's content only when the authoritative synced block-state
-     * {@code authoritative} confirms it, otherwise drop it (a placement the server refused or the player reverted
-     * reduces to the same negative gate). Pure, so it is exercised headless against hand-built block-states. The
-     * candidates stand or fall whole.
-     */
     static Optional<NBTTagCompound> confirm(IBlockState authoritative, Candidate candidate) {
         if (candidate instanceof HolderCandidate) {
             HolderCandidate held = (HolderCandidate) candidate;
@@ -451,13 +339,6 @@ public final class InteractionCapture {
         throw new IllegalStateException("unhandled candidate: " + candidate);
     }
 
-    /**
-     * The authoritative block-state at {@code pos} read off the captured chunk {@code snapshot} (the gate's source of
-     * truth): the same artifact the merge writes into, and current even after the chunk unloads, since the re-capture
-     * machinery keeps a hot chunk's snapshot block-state in step with the server. Returns null when no captured section
-     * covers the pos's Y, so the gate fails closed (drops the candidate) rather than reading a default state; a real
-     * interaction's pos never lands out of range.
-     */
     static @Nullable IBlockState blockStateAt(ChunkSnapshotSource snapshot, BlockPos pos) {
         int sectionY = pos.getY() >> 4;
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
@@ -473,13 +354,8 @@ public final class InteractionCapture {
     }
 
     /**
-     * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus the just-started playing
-     * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
-     * Vanilla restores that state, so the saved jukebox plays and emits the note particles; the disc sound itself
-     * cannot resume on load (an MC limitation, it fires only on the insert event).
-     *
-     * <p>Below 1.15 vanilla {@code ItemStack.writeToNBT} puts the live stack's own {@code tag} compound into its
-     * output, so the returned holder is detached before it is handed on and the caller owns it.
+     * Below 1.15 vanilla {@code ItemStack.writeToNBT} puts the live stack's own {@code tag} compound into its output,
+     * so the returned holder is detached before it is handed on and the caller owns it.
      */
     static NBTTagCompound captureRecordItem(ItemStack disc) {
         NBTTagCompound holder = new NBTTagCompound();

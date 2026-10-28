@@ -31,18 +31,6 @@ import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for interaction-prediction's reconcile gate: a predicted interaction is captured optimistically
- * before the server acks it, so the gate ({@link InteractionCapture#confirm}) must persist content only when the
- * authoritative synced block-state confirms it and discard a prediction the server never confirmed. The decision is a
- * pure function of a {@link IBlockState} and a {@code Candidate}, so it is proven headless with hand-built block-states
- * and candidates (no live client, no {@code Level}). The server-rejected discard is asserted directly on the pure
- * {@code confirm} decision.
- *
- * <p>Also covers the two seams the reconcile leans on headless: reading the authoritative block-state off a captured
- * snapshot section ({@link InteractionCapture#blockStateAt}) and the open-time-wins precedence
- * ({@link ContainerMerge#mergePlaceCandidates}).
- */
 class InteractionStashMergeTest {
     private final ContainerSink sink = new ContainerSinkImpl();
 
@@ -51,7 +39,6 @@ class InteractionStashMergeTest {
         TestRegistries.bootstrap();
     }
 
-    /** An interaction capture with no-op bookshelf-slot and placed-container sinks, for the tests that ignore them. */
     private static InteractionCapture plainCapture(ContainerSink sink,
             boolean recaptureEnabled) {
         return plainCapture(sink, recaptureEnabled, chunk -> true);
@@ -69,8 +56,6 @@ class InteractionStashMergeTest {
         return sink.captureItems(items);
     }
 
-    // A placed or inserted prediction the block-state confirms survives the gate.
-
     @Test
     void jukeboxWithRecordKeepsTheRecordHolder() {
         NBTTagCompound holder = InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT));
@@ -83,8 +68,6 @@ class InteractionStashMergeTest {
         assertTrue(confirmed.isPresent(), "HAS_RECORD true confirms the inserted disc");
         assertSame(holder, confirmed.get());
     }
-
-    // The headline discard: a prediction the synced block-state never confirms is dropped.
 
     @Test
     void jukeboxDiscardedWhenNoRecord() {
@@ -103,13 +86,9 @@ class InteractionStashMergeTest {
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
-        // The block at the pos is not a jukebox, so the instanceof short-circuits before reading HAS_RECORD: the
-        // candidate is discarded rather than throwing on a property the block does not have.
         assertTrue(!InteractionCapture.confirm(Blocks.STONE.getDefaultState(), candidate).isPresent(),
                 "a jukebox prediction against a non-jukebox block discards, it does not throw");
     }
-    // Per-slot gate independence: one slot survives while another is dropped.
-    // Place-then-open precedence: an opened container supersedes a stale place-time snapshot.
 
     @Test
     void openTimeHolderSupersedesPlaceCandidateAtTheSamePos() {
@@ -117,10 +96,10 @@ class InteractionStashMergeTest {
         BlockPos placedOnly = new BlockPos(12, 70, 20);
 
         Map<BlockPos, NBTTagCompound> openTimeBundle = new LinkedHashMap<>();
-        openTimeBundle.put(opened, itemsHolder(0, new ItemStack(Items.DIAMOND))); // ground-truth, edited open
+        openTimeBundle.put(opened, itemsHolder(0, new ItemStack(Items.DIAMOND)));
         Map<BlockPos, NBTTagCompound> confirmedPlace = new LinkedHashMap<>();
-        confirmedPlace.put(opened, itemsHolder(0, new ItemStack(Blocks.DIRT))); // stale place snapshot, must lose
-        confirmedPlace.put(placedOnly, itemsHolder(0, new ItemStack(Items.GOLD_INGOT))); // place-only, must survive
+        confirmedPlace.put(opened, itemsHolder(0, new ItemStack(Blocks.DIRT)));
+        confirmedPlace.put(placedOnly, itemsHolder(0, new ItemStack(Items.GOLD_INGOT)));
 
         Map<BlockPos, NBTTagCompound> surviving = ContainerMerge.mergePlaceCandidates(openTimeBundle, confirmedPlace);
 
@@ -128,8 +107,6 @@ class InteractionStashMergeTest {
         assertTrue(surviving.containsKey(placedOnly), "a place-and-never-open pos still merges");
         assertEquals(1, surviving.size());
     }
-
-    // The gate's authoritative block-state read off a captured snapshot section.
 
     @Test
     void blockStateAtReadsThePlacedBlockFromTheSnapshotSection() {
@@ -150,8 +127,6 @@ class InteractionStashMergeTest {
         assertNull(InteractionCapture.blockStateAt(snapshot, new BlockPos(5, 5000, 7)),
                 "an out-of-range Y has no captured section, so the gate reads null and fails closed");
     }
-
-    // The per-chunk reconcile: route each confirmed candidate to its merge target, drop the rest.
 
     private static Map<BlockPos, InteractionCapture.Candidate> oneCandidate(BlockPos pos,
             InteractionCapture.Candidate candidate) {
@@ -187,7 +162,7 @@ class InteractionStashMergeTest {
     @Test
     void reconcileDropsCandidateWithNoCapturedSection() {
         BlockPos placed = new BlockPos(5, -60, 7);
-        BlockPos elsewhere = new BlockPos(5, 5000, 7); // a Y the snapshot has no section for
+        BlockPos elsewhere = new BlockPos(5, 5000, 7);
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(elsewhere, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.JUKEBOX,
@@ -198,9 +173,6 @@ class InteractionStashMergeTest {
         assertTrue(bundles.holders().isEmpty(), "no captured section covers the pos, so the gate fails closed");
     }
 
-    // Recognition: a right-click on a bookshelf or jukebox records an insert candidate only when the block would
-    // consume it (a book, a playable disc), so a content block placed against that face falls through to a place
-    // capture instead of being dropped.
     /**
      * A placement in a cell whose chunk will never be captured again must NOT drop what the session already captured
      * there. That chunk is on disk and the residual sweep folds onto the copy that predates this placement, so the
@@ -220,7 +192,6 @@ class InteractionStashMergeTest {
                 "the chunk is written and frozen, so the block on disk still predates this placement");
     }
 
-    /** And the same placement where the chunk WILL be captured again does drop it, or the guard is a blanket. */
     @Test
     void aPlacementInTheRecapturedCellDropsWhatWasCapturedThere() {
         long[] sinkPos = { -1L };
@@ -260,8 +231,6 @@ class InteractionStashMergeTest {
 
     @Test
     void noInsertIsRecordedWhenRecaptureIsOff() {
-        // Without re-capture the reconcile gate never sees the post-insert block-state, so any candidate would be
-        // silently discarded; the recognizer must record nothing rather than stash a doomed candidate.
         InteractionCapture capture = plainCapture(sink, false);
         IBlockState emptyJukebox = Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false);
 
@@ -275,8 +244,6 @@ class InteractionStashMergeTest {
     @Test
     void throwingRecognitionIsSwallowedFailSoft() {
         InteractionCapture capture = plainCapture(sink, true);
-        // A pathological component can make the click-time codec encode throw; the recognizer must skip that one
-        // capture rather than letting it escape to the loader event and crash the client mid-download.
         assertDoesNotThrow(() -> capture.recordFailSoft(new BlockPos(0, 70, 0), () -> {
             throw new IllegalStateException("encode blew up");
         }));
@@ -290,17 +257,13 @@ class InteractionStashMergeTest {
                 pos, new ItemStack(Items.RECORD_CAT));
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the disc insert is stashed");
 
-        // A dimension rebind must drop every old-dimension candidate so none carries into the new ChunkPos space,
-        // and the caller counts what it drops, since none of it was written.
+        // A dimension rebind must drop every old-dimension candidate so none carries into the new ChunkPos space.
         List<BlockPos> dropped = capture.drainResidualPositions();
 
         assertEquals(ImmutableList.of(pos), dropped, "the residual names the position whose content is missing");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "and leaves nothing stashed");
     }
 
-    // The per-chunk capturability gate. A chunk already written and frozen is re-captured by nothing, so its
-    // reconcile gate has no post-interaction block-state and no flush ever drains the candidate: recording one
-    // there can only end in a silent drop, with the outline already told the content is downloaded.
     @Test
     void aJukeboxInsertInAnUncapturableChunkIsNotStashed() {
         InteractionCapture capture = plainCapture(sink, true, chunk -> false);
@@ -315,8 +278,8 @@ class InteractionStashMergeTest {
 
     @Test
     void aPlacementInAnUncapturableChunkStillSupersedesAnEarlierPredictionThere() {
-        // The supersede is not a capture: leaving a stale prediction at a cell a new block now occupies is how
-        // one block's contents get written onto another, which is worse than capturing nothing.
+        // Leaving a stale prediction at a cell a new block now occupies is how one block's contents get written onto
+        // another.
         boolean[] capturable = { true };
         InteractionCapture capture = plainCapture(sink, true, chunk -> capturable[0]);
         BlockPos pos = new BlockPos(4, 70, 8);

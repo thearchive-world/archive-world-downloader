@@ -13,19 +13,15 @@ import java.util.Collections;
 import net.minecraft.client.gui.GuiButton;
 import org.junit.jupiter.api.Test;
 
-/**
- * The pause-menu anchor rule. This band's pause screen names no disconnect button, so geometry is the only signal
- * available and the rule has to separate the menu column from a corner button on shape alone.
- */
 class AbstractPlatformBridgeTest {
-    // A 427 by 240 pause screen, vanilla's own layout at the common GUI scale: a 200-wide column centered on 213.
+    // A 427 by 240 pause screen, vanilla's own layout: a 200-wide column centered on 213.
     private static final int SCREEN_WIDTH = 427;
     private static final int SCREEN_HEIGHT = 240;
     private static final int COLUMN_X = SCREEN_WIDTH / 2 - 100;
 
     @Test
     void cornerButtonDoesNotOutrankTheMenuColumn() {
-        // Just Zoom's pause-screen button: 20 by 20 at the bottom left, below every vanilla button.
+        // A corner button: 20 by 20 at the bottom left, below every vanilla button.
         GuiButton corner = button(20, SCREEN_HEIGHT - 40, 20, 20);
         GuiButton disconnect = button(COLUMN_X, 150, 200, 20);
         assertSame(disconnect, AbstractPlatformBridge.lowestColumnButton(
@@ -62,7 +58,7 @@ class AbstractPlatformBridgeTest {
 
     @Test
     void theShiftSpansTheColumnAndSparesCornerButtons() {
-        // Just Zoom's button sits below the anchor at the bottom left. Moving it clipped it off the screen edge.
+        // The corner button sits below the anchor at the bottom left. Moving it would clip it off the screen edge.
         assertFalse(AbstractPlatformBridge.movesWithAnchor(
                 button(20, SCREEN_HEIGHT - 40, 20, 20), COLUMN_X, 150, 200));
         assertTrue(AbstractPlatformBridge.movesWithAnchor(

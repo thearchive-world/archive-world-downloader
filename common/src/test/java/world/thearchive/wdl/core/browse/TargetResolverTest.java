@@ -51,10 +51,6 @@ class TargetResolverTest {
 
     @Test
     void aReservedWindowsDeviceNameIsDefusedInAnyCase() {
-        // Windows refuses CON/PRN/AUX/NUL/COM1-9/LPT1-9 as a folder basename, case-insensitively. Without the
-        // defusing suffix the UI accepts the name (hasUsableName is true) and the download then dies at
-        // createAccess with a generic save failure; with it the folder the user gets matches what they typed
-        // as closely as the filesystem allows.
         assertEquals("CON_", TargetResolver.sanitize("CON"));
         assertEquals("PRN_", TargetResolver.sanitize("PRN"));
         assertEquals("AUX_", TargetResolver.sanitize("AUX"));
@@ -65,9 +61,6 @@ class TargetResolverTest {
 
     @Test
     void aReservedStemAheadOfTheFirstDotIsDefusedAndLookalikesAreNot() {
-        // Windows reserves by the portion before the first dot, so NUL.txt is as unusable as NUL; the
-        // underscore lands on the stem to lift the whole name out of the reserved set. Names merely starting
-        // with a device word are legal and stay untouched.
         assertEquals("NUL_.txt", TargetResolver.sanitize("NUL.txt"));
         assertEquals("con_.backup.old", TargetResolver.sanitize("con.backup.old"));
         assertEquals("CONS", TargetResolver.sanitize("CONS"));
@@ -77,8 +70,6 @@ class TargetResolverTest {
 
     @Test
     void theSuperscriptDigitDeviceFormsAreDefusedToo() {
-        // The Win32 naming rules also reserve the superscript-digit forms of the serial and printer devices;
-        // they parse as the corresponding COM or LPT device, so they are as uncreatable as the plain digits.
         assertEquals("COM¹_", TargetResolver.sanitize("COM¹"));
         assertEquals("lpt³_.txt", TargetResolver.sanitize("lpt³.txt"));
     }
@@ -159,12 +150,8 @@ class TargetResolverTest {
     @Test
     void resumeTargetReadsBackTheOnDiskSpelling(@TempDir Path saves) throws IOException {
         Files.createDirectories(saves.resolve("World"));
-        // Case-insensitive FS behavior cannot be forced on POSIX CI, so the readback contract is tested
-        // via the exact path (identity readback) plus the miss path; the case-variant readback is covered
-        // by the same toRealPath call and lands on the Windows manual gate.
         DownloadTarget target = TargetResolver.resolveResume("World", saves);
         assertEquals("World", target.folderName());
-        // A typed name that resolves nowhere keeps the typed spelling (the caller already classified).
         assertEquals("Ghost", TargetResolver.resolveResume("Ghost", saves).folderName());
     }
 

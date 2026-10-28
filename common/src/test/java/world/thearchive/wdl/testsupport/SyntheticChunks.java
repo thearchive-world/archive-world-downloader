@@ -19,19 +19,13 @@ import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
-/**
- * Synthetic {@link ChunkSnapshotSource} fixtures for the headless codec round-trip.
- *
- * <p>These build {@link ExtendedBlockStorage}s (known blocks, PLAINS biomes) with no {@code World}, which a headless
- * {@code Chunk} cannot avoid, so the round-trip exercises the mod's encode slice.
- */
 public final class SyntheticChunks {
-    /** A standard 1.10.2 overworld column: 0..256, so {@code minSectionY == 0}. */
+    /** A standard overworld column: 0..256, so {@code minSectionY == 0}. */
     public static final int MIN_Y = 0;
     public static final int HEIGHT = 256;
     public static final long GAME_TIME = 1234L;
 
-    /** A recognizable HeightMap value so the round-trip can assert the kept heightmap survives. */
+    /** A recognizable {@code HeightMap} value so the round-trip can assert the kept heightmap survives. */
     public static final int WORLD_SURFACE_SENTINEL = 63;
 
     /** Uniform per-cell light levels for the lit fixture, distinct so a swapped layer is caught. */
@@ -50,8 +44,7 @@ public final class SyntheticChunks {
 
     /**
      * As {@link #full} but with the given block-entity NBT (saved form, each carrying its own {@code id} +
-     * {@code x/y/z}). Models a chunk re-captured after a block entity is placed, edited, or broken, so the codec
-     * round-trip can prove a re-encode reflects the current block-entity set.
+     * {@code x/y/z}).
      */
     public static ChunkSnapshotSource fullWithBlockEntities(boolean lightCorrect,
             List<NBTTagCompound> blockEntities) {
@@ -59,8 +52,7 @@ public final class SyntheticChunks {
     }
 
     /**
-     * As {@link #fullWithBlockEntities} without the producer-shape check, for a case whose subject IS a shape no
-     * producer emits: a tag from a foreign or modded server that the codec must pass through opaquely.
+     * As {@link #fullWithBlockEntities} without the producer-shape check.
      */
     public static ChunkSnapshotSource fullWithMalformedBlockEntities(boolean lightCorrect,
             List<NBTTagCompound> blockEntities) {
@@ -87,10 +79,8 @@ public final class SyntheticChunks {
     }
 
     /**
-     * Every block entity as the chunk layer hands it over, which is where a snapshot's list comes from in production
-     * ({@code Chunk.getTileEntityMap}): checked against its producer's shape. This is the choke point for the snapshot
-     * axis, the way {@code chunkTagWith} is for a serialized chunk tag; without it a snapshot is a third way a
-     * hand-built block entity reaches production code unchecked.
+     * Every block entity, checked against its producer's shape when {@code checkShape} is set; without the check a
+     * snapshot is a way a hand-built block entity reaches production code unchecked.
      */
     private static List<NBTTagCompound> saved(List<NBTTagCompound> blockEntities, boolean checkShape) {
         List<NBTTagCompound> checked = new ArrayList<>();
@@ -104,7 +94,6 @@ public final class SyntheticChunks {
         return ImmutableList.copyOf(checked);
     }
 
-    /** The flat {@code int[256]} heightmap this band carries, one entry marked with the sentinel. */
     private static int[] standardHeightmap() {
         int[] heightMap = new int[HEIGHT];
         heightMap[0] = WORLD_SURFACE_SENTINEL;
@@ -112,9 +101,7 @@ public final class SyntheticChunks {
     }
 
     /**
-     * A snapshot of {@code worldPos}'s chunk carrying {@code state} at {@code worldPos} (the rest air), for the
-     * reconcile gate's block-state read: only the one section containing {@code worldPos} is built, its {@code y()} set
-     * so the section lookup ({@code pos.getY() >> 4}) resolves it.
+     * A snapshot of {@code worldPos}'s chunk carrying {@code state} at {@code worldPos}.
      */
     public static ChunkSnapshotSource withBlockAt(BlockPos worldPos, IBlockState state) {
         TestRegistries.bootstrap();
@@ -128,18 +115,13 @@ public final class SyntheticChunks {
     }
 
     /**
-     * As {@link #withBlockAt} but also carrying {@code blockEntity} in the snapshot's block-entity list, for a path
-     * that has to find a block entity and then read the block-state under it.
+     * As {@link #withBlockAt} but also carrying {@code blockEntity} in the snapshot's block-entity list.
      */
     public static ChunkSnapshotSource withBlockEntityAt(BlockPos worldPos,
             IBlockState state, NBTTagCompound blockEntity) {
         return withBlockEntityAt(worldPos, state, blockEntity, true);
     }
 
-    /**
-     * As {@link #withBlockEntityAt} without the producer-shape check, for a case whose subject is a tag a producer
-     * never writes, such as one with a coordinate deliberately removed to prove the reader drops it.
-     */
     public static ChunkSnapshotSource withMalformedBlockEntityAt(BlockPos worldPos,
             IBlockState state, NBTTagCompound blockEntity) {
         return withBlockEntityAt(worldPos, state, blockEntity, false);
@@ -161,8 +143,8 @@ public final class SyntheticChunks {
     /**
      * As {@link #full} with {@code lightCorrect=true} and captured light layers, including a below-chunk padding
      * section (sky only, null chunk section). Proves the encode slice writes the vanilla section-resident
-     * {@code BlockLight}/{@code SkyLight} shape for the in-range sections and drops a section outside the 0..15 block
-     * column, which has no home in this band's on-disk shape.
+     * {@code BlockLight}/{@code SkyLight} shape and drops a section outside the 0..15 block column, which has no home
+     * in this band's on-disk shape.
      */
     public static ChunkSnapshotSource fullWithLight() {
         TestRegistries.bootstrap();
@@ -192,7 +174,6 @@ public final class SyntheticChunks {
         return data;
     }
 
-    /** PLAINS-filled per-column biome ids: the flat 16x16 grid this band carries, 256 columns indexed z*16+x. */
     private static int[] plainsBiomes() {
         int plainsId = Biome.getIdForBiome(Biomes.PLAINS);
         int[] biomes = new int[16 * 16];

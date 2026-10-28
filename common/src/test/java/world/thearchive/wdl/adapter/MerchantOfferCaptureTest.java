@@ -22,14 +22,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the merchant-offer capture transform: {@link MerchantOfferCapture#serialize} writes a
- * villager's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}}} holder through the trade list's own NBT
- * write, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell} item through the same
- * item-location scrub and map-id remap every captured item takes. Real {@link ItemStack}s carrying the tags drive the
- * round-trip, so a wrong key leaves the coordinate or the session map id and fails; no live menu or {@code World} is
- * needed.
- */
 class MerchantOfferCaptureTest {
     @BeforeAll
     static void bootstrapVanilla() {
@@ -58,7 +50,6 @@ class MerchantOfferCaptureTest {
     }
 
     private static MerchantRecipeList offering(ItemStack sell) {
-        // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
         MerchantRecipeList offers = new MerchantRecipeList();
         offers.add(new MerchantRecipe(new ItemStack(Items.EMERALD, 1), sell));
         return offers;
@@ -68,7 +59,6 @@ class MerchantOfferCaptureTest {
         return MerchantOfferCapture.serialize(offering(sell));
     }
 
-    /** The {@code sell} item's own serialized compound ({@code {id, Count, Damage, tag}}), no nesting below it. */
     private static NBTTagCompound sellItem(NBTTagCompound holder) {
         return holder.getCompoundTag("Offers").getTagList("Recipes", 10).getCompoundTagAt(0)
                 .getCompoundTag("sell");
@@ -140,13 +130,11 @@ class MerchantOfferCaptureTest {
 
     @Test
     void reStashingTheSameLiveOffersResolvesToOneArchiveId() {
-        // The offers are re-stashed every tick the trade screen is open, each tick building a fresh holder.
         ItemStack live = filledMap(7);
         MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
 
         NBTTagCompound first = holderSelling(live);
         MerchantOfferCapture.scrubAndRemapOffers(first, false, archive);
-        // Read before the second pass: a holder that still aliases the live stack would report the later id here.
         short firstId = sellItem(first).getShort("Damage");
         NBTTagCompound second = holderSelling(live);
         MerchantOfferCapture.scrubAndRemapOffers(second, false, archive);
@@ -169,6 +157,6 @@ class MerchantOfferCaptureTest {
         NBTTagCompound holder = holderSelling(new ItemStack(Items.DIAMOND));
         holder.getCompoundTag("Offers").getTagList("Recipes", 10).getCompoundTagAt(0).removeTag("sell");
 
-        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null); // must not throw; reaches the per-recipe skip
+        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
     }
 }

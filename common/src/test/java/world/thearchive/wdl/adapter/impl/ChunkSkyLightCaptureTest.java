@@ -24,21 +24,15 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 
 /**
- * The sky-light content gate: pins what {@link ChunkCodecImpl#capture} puts under a section's {@code SkyLight} key in
- * each dimension. It drives the real per-dimension provider because a stub would assert this band's own reading of
- * {@code hasNoSky} against itself and stay green however the read is spelled.
- *
- * <p>Presence alone proves nothing here, since vanilla writes {@code SkyLight} in every section of every dimension and
- * so does the encode. The defect this catches is a present, 2048-byte, entirely zero sky layer where the live chunk's
- * is lit, and nothing reports it: the loader accepts the save and no reopen repairs it, because {@code LightPopulated}
- * is captured true and vanilla relights only an unlit terrain-populated chunk.
+ * Presence alone proves nothing here, since vanilla writes {@code SkyLight} in every section of every dimension and so
+ * does the encode.
  */
 class ChunkSkyLightCaptureTest {
     private static final int SECTION_Y = 0;
     private static final int SECTION_LAYER_BYTES = 2048;
 
-    // Neither fill may be zero and the two must differ, or the assertions stop telling the live sky layer apart from
-    // the zero fill and from the block layer.
+    // Neither fill may be zero and the two must differ, or the assertions stop telling a live layer apart from the zero
+    // fill, or the sky layer from the block layer.
     private static final byte SKY_FILL = (byte) 0xB7;
     private static final byte BLOCK_FILL = (byte) 0x4C;
 
@@ -81,10 +75,6 @@ class ChunkSkyLightCaptureTest {
                 "a dimension without sky light still has real block light, which must survive the capture");
     }
 
-    /**
-     * Capture and encode a one-section chunk in {@code dimension}, and return that section's tag. {@code storeSkylight}
-     * must match the dimension, the way a live client chunk does, or the skyless arms stop discriminating.
-     */
     private NBTTagCompound captureAndEncodeOneSection(DimensionType dimension, boolean storeSkylight) {
         World level = HeadlessLevel.get(dimension);
         Chunk chunk = new Chunk(level, 0, 0);

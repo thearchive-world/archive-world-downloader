@@ -29,18 +29,9 @@ import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the save-time container injection: {@link ContainerMerge#mergeChunkStash} locates a stashed
- * container's block entity inside the captured chunk tag by {@code BlockPos} (matching the {@code Level.TileEntities}
- * list's {@code x/y/z}) and sets its {@code "Items"}, touching no other block entity, then drains the merged entry as
- * the chunk is flushed. This is the part that must never mis-target (writing the wrong block's items corrupts the
- * archive), so it is proven headless with hand-built chunk tags (no live client, no {@code Level}).
- */
 class ContainerStashMergeTest {
     private final ContainerSink sink = new ContainerSinkImpl();
 
-    // A sink that merges ONLY the holder's "Items", so the state-key tests prove the whitelist copy happens
-    // beside the sink rather than inside it.
     private static final ContainerSink ITEMS_ONLY_SINK = new ContainerSink() {
         @Override
         public NBTTagCompound captureItems(ItemStack[] items) {
@@ -74,11 +65,11 @@ class ContainerStashMergeTest {
         BlockPos chestPos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(
                 blockEntity("Chest", 10, 70, 20),
-                blockEntity("Furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
+                blockEntity("Furnace", 11, 70, 20));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(chestPos, holderWith(2, new ItemStack(Items.EMERALD, 7)));
-        BlockPos elsewhere = new BlockPos(100, 70, 200); // a container in a different chunk, not being flushed
+        BlockPos elsewhere = new BlockPos(100, 70, 200);
         stash.put(elsewhere, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(chestPos), stash).merged();
@@ -99,7 +90,7 @@ class ContainerStashMergeTest {
     @Test
     void mergeChunkStashDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 2, 64, 1)); // a chest, but elsewhere
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 2, 64, 1));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -117,9 +108,6 @@ class ContainerStashMergeTest {
 
     @Test
     void mergeChunkStashCountsThrowingMergeAsFailedButStillDrains() {
-        // A band merge that throws must be isolated: the block's items are lost, the entry is still drained (its
-        // chunk is leaving memory, so it cannot wait for a retry), and the loss is counted so the caller reports a
-        // partial save honestly instead of a clean one.
         ContainerSink throwingSink = new ContainerSink() {
             @Override
             public NBTTagCompound captureItems(ItemStack[] items) {
@@ -160,9 +148,6 @@ class ContainerStashMergeTest {
         holder.setByte("Fuel", (byte) 7);
         holder.setString("wdl_block_entity_id", "Cauldron");
         holder.setString("junk", "never");
-        // The three captured content keys the sink does not own. They are what tells a whitelist keyed on
-        // open-time state apart from one that copies whatever it recognizes: a key this mod captures is not
-        // thereby state, and only the sink decides what content reaches the block entity.
         holder.setTag("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(1)));
         holder.setTag("RecordItem", ItemFixtures.itemTag("minecraft:record_cat"));
         holder.setTag("bees", BlockEntityFixtures.bees(20));
@@ -179,16 +164,14 @@ class ContainerStashMergeTest {
         assertEquals((byte) 7, mergedBlockEntity.getByte("Fuel"));
         assertFalse(mergedBlockEntity.hasKey("wdl_block_entity_id"), "the internal holder key never reaches disk");
         assertFalse(mergedBlockEntity.hasKey("junk"), "a non-whitelisted holder key never reaches disk");
-        assertFalse(mergedBlockEntity.hasKey("Book"), "a lectern book is content, not open-time state");
+        assertFalse(mergedBlockEntity.hasKey("Book"), "a Book key is content, not open-time state");
         assertFalse(mergedBlockEntity.hasKey("RecordItem"), "and so is a jukebox disc");
-        assertFalse(mergedBlockEntity.hasKey("bees"), "and so are a beehive's occupants");
+        assertFalse(mergedBlockEntity.hasKey("bees"), "and a bees key is not open-time state either");
     }
 
     @Test
     void holderWithoutStateKeysMergesItemsOnly() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        // The captured brewing stand carries NON-default state, so "the merge left it alone" is distinguishable from
-        // "the merge rewrote it with defaults". At the producer defaults the two are the same tag.
         NBTTagCompound brewingStand = blockEntity("Cauldron", 10, 70, 20);
         brewingStand.setShort("BrewTime", (short) 220);
         brewingStand.setByte("Fuel", (byte) 12);

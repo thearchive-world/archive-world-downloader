@@ -20,17 +20,10 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for {@link PlayerProgressSerializer}: the stats JSON carries no {@code DataVersion} stamp at this
- * era (that is a 1.13+ addition), the blob is the flat {@code {"stat.<id>": <count>}} shape enumerated over
- * {@link StatList#ALL_STATS}, and a zero-valued stat is filtered out. There is no advancements blob to guard beside it:
- * advancements are a 1.12 addition, and this band's achievements enumerate through the same StatList as ordinary
- * {@code achievement.*} keys.
- */
 class PlayerProgressSerializerTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // boots the StatList statics (side effect only)
+        TestRegistries.bootstrap();
     }
 
     private static JsonObject parse(byte[] json) {
@@ -46,7 +39,7 @@ class PlayerProgressSerializerTest {
         assertNotNull(stoneMined, "vanilla registers a mine-block stat for every block");
         assertNotNull(dirtMined, "vanilla registers a mine-block stat for every block");
         counter.increaseStat(null, stoneMined, 5);
-        counter.increaseStat(null, dirtMined, 0); // a zero must be filtered out
+        counter.increaseStat(null, dirtMined, 0);
 
         byte[] bytes = PlayerProgressSerializer.statsJson(counter);
         assertNotNull(bytes, "a populated counter yields a blob");

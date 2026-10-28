@@ -45,25 +45,12 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The on-disk guard for a container vehicle that moves between two entity-chunk flushes. Its captured contents exist
- * only in the stash, which the first fold drains, so every later serialize of the same vehicle is empty; the entity
- * read-merge carries {@code "Items"} forward only inside the chunk file it is writing, so a copy filed under a new
- * chunk key would otherwise be a second on-disk entity with the same UUID and no contents, and vanilla keeps whichever
- * loads first. The remedy pinned here is that the retained holder is re-folded into every later copy, so which one
- * survives stops mattering.
- *
- * <p>Asserted against the region chunk's {@code Level.Entities} bytes rather than against a counter or a log line,
- * because that is the only place the second copy is visible: every write succeeds, all are ordinary, and no tally
- * moves. Each case reads every chunk the flushes could have touched and inspects the UUID in all of them.
- *
- * <p>Suppressing the second write instead was tried and rejected: it dropped whatever else the later tag carried, most
- * sharply a passenger that boarded since, which reaches disk nowhere but nested in its vehicle.
+ * Asserted against the region chunk's {@code Level.Entities} bytes rather than against a counter or a log line, because
+ * that is the only place the second copy is visible: every write succeeds, all are ordinary, and no tally moves.
  */
 class EntityVehicleRelocationTest {
     private final ContainerSink sink = new ContainerSinkImpl();
 
-    // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching
-    // one before the bootstrap in @BeforeAll fails the whole class with "Not bootstrapped".
     private final ChunkPos opened = new ChunkPos(0, 0);
     private final ChunkPos drifted = new ChunkPos(1, 0);
 
@@ -79,14 +66,14 @@ class EntityVehicleRelocationTest {
             throws Exception {
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
-        seedHosts(paths, opened, drifted); // entities fold into their host chunks
+        seedHosts(paths, opened, drifted);
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
 
-        session.flushEntityChunk(writer, opened); // the player opened it here; the fold drains the stash
+        session.flushEntityChunk(writer, opened);
 
-        bufferEntity(session, VEHICLE, drifted, entity(VEHICLE)); // re-announced a chunk over, nothing left to fold
+        bufferEntity(session, VEHICLE, drifted, entity(VEHICLE));
         session.flushEntityChunk(writer, drifted);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -101,14 +88,14 @@ class EntityVehicleRelocationTest {
     void aReFlushOfTheSameChunkStillWritesAndKeepsTheContents(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
-        seedHosts(paths, opened, drifted); // entities fold into their host chunks
+        seedHosts(paths, opened, drifted);
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
 
         session.flushEntityChunk(writer, opened);
-        // The second copy carries a field the first does not, so the assertion can tell a real re-write apart
-        // from a suppressed one: without it the first write's bytes would satisfy every check on their own.
+        // The second copy carries a field the first does not, so the assertion can tell a real re-write apart from a
+        // suppressed one.
         bufferEntity(session, VEHICLE, opened, entityWithAir(VEHICLE, (short) 42));
         session.flushEntityChunk(writer, opened);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -127,15 +114,13 @@ class EntityVehicleRelocationTest {
             throws Exception {
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
-        seedHosts(paths, opened, drifted); // entities fold into their host chunks
+        seedHosts(paths, opened, drifted);
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
 
         session.flushEntityChunk(writer, opened);
 
-        // The player catches up with the boat and opens it again: the fresh capture has contents of its own, so
-        // suppressing this write would drop the newer loot on the floor.
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.EMERALD, 3)));
         bufferEntity(session, VEHICLE, drifted, entity(VEHICLE));
         session.flushEntityChunk(writer, drifted);
@@ -152,16 +137,13 @@ class EntityVehicleRelocationTest {
 
     @Test
     void aReboardedMountIsWrittenWholeRatherThanSkipped(@TempDir Path temporary) throws Exception {
-        // The finish-time ridden-mount path used to give up when the stash had already drained into an earlier
-        // standalone write: it skipped the RootVehicle entirely, which took the mount's finish position and any
-        // passenger aboard with it. The retained holder is exactly what that path was missing.
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
-        seedHosts(paths, opened, drifted); // entities fold into their host chunks
+        seedHosts(paths, opened, drifted);
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
-        session.flushEntityChunk(writer, opened); // drains the stash, retains the holder
+        session.flushEntityChunk(writer, opened);
         writer.finish().get(30, TimeUnit.SECONDS);
 
         NBTTagCompound folded = session.foldRidingVehicleContents(entity(VEHICLE));
@@ -173,19 +155,17 @@ class EntityVehicleRelocationTest {
 
     @Test
     void aReboardedMountsMapIsNotRemappedTwice(@TempDir Path temporary) throws Exception {
-        // The map remap is documented non-idempotent: a second pass reads an already-archived id as a session
-        // id and re-resolves it, so the mount's map ends up naming a different picture or no file at all. The
-        // guard is an identity-keyed set, which means anything that re-copies a retained holder silently
-        // defeats it, and level.dat is where the damage lands.
+        // The map remap's guard is an identity-keyed set, which means anything that re-copies a retained holder
+        // silently defeats it.
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
-        seedHosts(paths, opened, drifted); // entities fold into their host chunks
+        seedHosts(paths, opened, drifted);
         AsyncSaveWriter writer = saveWriter(paths);
         bindArchive(session, new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {}));
         stashEntityContainer(session, VEHICLE, holderReferencing(sink, 4242));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
 
-        session.flushEntityChunk(writer, opened); // remaps once and retains the holder
+        session.flushEntityChunk(writer, opened);
         writer.finish().get(30, TimeUnit.SECONDS);
         int archivedId = mapIdOf(retainedHolder(session, VEHICLE));
 
@@ -197,9 +177,6 @@ class EntityVehicleRelocationTest {
                         + "the mount ends up naming another map's picture, or none");
     }
 
-    /**
-     * The map id the first item of a tag's container contents references (at 1.10.2, the item-level {@code Damage}).
-     */
     private static int mapIdOf(NBTTagCompound tag) {
         NBTTagList items = (NBTTagList) tag.getTag("Items");
         return ((NBTTagCompound) items.get(0)).getShort("Damage");
@@ -218,7 +195,6 @@ class EntityVehicleRelocationTest {
         field.set(session, archive);
     }
 
-    /** The item ids of an entity tag's container contents, for telling one capture of a vehicle from another. */
     private static Set<String> itemIds(NBTTagCompound entity) {
         Set<String> ids = new HashSet<>();
         if (entity.getTag("Items") instanceof NBTTagList) {
@@ -230,9 +206,6 @@ class EntityVehicleRelocationTest {
         return ids;
     }
 
-    /**
-     * Every on-disk entity tag carrying {@code uuid}, across each region chunk's Level.Entities the flushes reached.
-     */
     private static List<NBTTagCompound> entitiesOnDisk(WorldPaths paths, UUID uuid, ChunkPos... positions)
             throws Exception {
         List<NBTTagCompound> found = new ArrayList<>();
@@ -256,9 +229,8 @@ class EntityVehicleRelocationTest {
     }
 
     /**
-     * A session with no bound level, which is all the entity flush needs. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
-     * clears; the flush entry point itself reads neither toggle.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots, which only {@code finish()} clears; the flush entry point itself reads neither toggle.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -291,7 +263,6 @@ class EntityVehicleRelocationTest {
         }
     }
 
-    /** A writer over the real region storage, since the duplicate is only visible in the written bytes. */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
@@ -302,14 +273,12 @@ class EntityVehicleRelocationTest {
                 new SaveProgress());
     }
 
-    /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static NBTTagCompound entity(UUID uuid) {
         NBTTagCompound entity = new NBTTagCompound();
         entity.setUniqueId("UUID", uuid);
         return entity;
     }
 
-    /** The same tag plus a vanilla field the readback can distinguish one serialize of an entity from another by. */
     private static NBTTagCompound entityWithAir(UUID uuid, short air) {
         NBTTagCompound entity = entity(uuid);
         entity.setShort("Air", air);
@@ -334,11 +303,6 @@ class EntityVehicleRelocationTest {
         buffer.accumulate(uuid, pos, tag);
     }
 
-    /**
-     * One of the session's capture-state collections, to seed. Reflective because every production path that fills one
-     * runs behind the client singleton (a menu open, a packet-driven promote), and widening the fields would publish
-     * mutable capture state to the whole package for a test's convenience.
-     */
     @SuppressWarnings("unchecked")
     private static <T> T state(LiveCaptureSession session, String name) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField(name);

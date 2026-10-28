@@ -28,14 +28,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * The gate between the keys the code names and the keys en_us carries, in both directions. {@link LangFidelityTest}
- * holds the 32 locales to en_us and never looks at the code, so without this a key only production names could be
- * absent from every catalog and stay green: MC renders a missing key as the raw key string, and a tooltip behind
- * {@code I18n.exists} renders nothing at all.
- *
- * <p>MC-free: source and resource reads off the module tree, the {@link UiLiteralEnrollmentTest} pattern.
- */
 class LangKeyCoverageTest {
     private static final Path CATALOG = Paths.get("src/main/resources/assets/wdl/lang/en_us.json");
 
@@ -44,8 +36,7 @@ class LangKeyCoverageTest {
             Paths.get("../fabric/src/main/java/world/thearchive/wdl"),
             Paths.get("../neoforge/src/main/java/world/thearchive/wdl"));
 
-    // Anchored on both quotes so a log line that merely mentions wdl.properties is not read as a key, and narrowed
-    // to the three shapes the project uses so vanilla's own key.* names cannot be swept in.
+    // Anchored on both quotes so a log line that merely mentions wdl.properties is not read as a key.
     private static final Pattern keyLiteral = Pattern
             .compile("\"((?:wdl|key\\.wdl|key\\.category\\.wdl)\\.[A-Za-z0-9_.]+)\"");
 
@@ -74,9 +65,7 @@ class LangKeyCoverageTest {
             "wdl.settings.tab.",
             "wdl.settings.value.");
 
-    // The controls heading MC derives from the wdl:downloader category identifier, and the two entries
-    // ModMenu reads off the mod id. key.wdl.peek_hud is constructed in the forge/ island (WdlForge), outside
-    // this test's PRODUCTION_ROOTS.
+    // key.wdl.peek_hud is constructed in the forge/ island (WdlForge), outside this test's PRODUCTION_ROOTS.
     private static final Set<String> EXTERNAL_CONSUMERS = ImmutableSet.of(
             "key.categories.wdl.downloader",
             "key.wdl.peek_hud",
@@ -85,14 +74,12 @@ class LangKeyCoverageTest {
 
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
-    // Strings the higher bands show that this band does not: a button hover-tooltip these screens do not draw, a
-    // screen title (GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's
-    // narration message (GuiTextField takes no message). Their en_us strings stay so the catalog matches the
-    // higher bands, but no consumer reaches them on this band.
+    // Strings the higher bands show that this band does not: a button hover-tooltip these screens do not draw, a screen
+    // title (GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's narration
+    // message (GuiTextField takes no message).
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
-            // No narrator exists below 1.12: neither NarratorChatListener nor ChatType is in this band's Minecraft,
-            // and the text-to-speech library they drive is not in its library set, so the downloads list is not
-            // narrated here and the key it would have spoken reaches nothing.
+            // No narrator exists below 1.12: neither NarratorChatListener nor ChatType is in this band's Minecraft, so
+            // the downloads list is not narrated here and the key it would have spoken reaches nothing.
             "wdl.screen.downloads.narration",
             "wdl.screen.downloads.download.tooltip",
             "wdl.screen.downloads.name",
@@ -189,7 +176,6 @@ class LangKeyCoverageTest {
         Set<String> literals = new TreeSet<>();
         for (Path root : PRODUCTION_ROOTS) {
             if (root.startsWith("..")) {
-                // A band ships only some loaders, so a loader root may be absent; only common's own root must exist.
                 if (!Files.isDirectory(root)) {
                     continue;
                 }

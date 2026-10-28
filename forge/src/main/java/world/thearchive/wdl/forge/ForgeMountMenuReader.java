@@ -13,10 +13,8 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.MountMenuReader;
 
 /**
- * The Forge mount-menu read: {@link MountMenuReader}'s seam plus the one non-public read it needs. The
- * horse-inventory menu's horse is private with no getter, and this band has no compile-time access-widening step, so
- * the shipped accesstransformer.cfg is a runtime-only FMLAT rather than a compile-time widening; the field is read
- * reflectively instead, resolved once by its dev (MCP) name with its production (searge) name as the fallback.
+ * The horse-inventory menu's horse is private with no getter; the field is read reflectively, resolved once by its dev
+ * (MCP) name with its production (searge) name.
  */
 final class ForgeMountMenuReader extends MountMenuReader {
     private static final Field HORSE_FIELD =

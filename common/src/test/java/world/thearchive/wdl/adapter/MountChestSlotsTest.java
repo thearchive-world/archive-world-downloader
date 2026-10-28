@@ -36,9 +36,9 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 
 /**
- * The gate on the chest size a mount menu binds by. The bind matches that size against the open menu's chest-slot count
- * by exact equality and, on a mismatch, drops the open with no log line and no loss-report row, so a size wrong at all
- * discards every donkey and mule chest without a trace.
+ * The bind matches the mount's chest size against the open menu's chest-slot count by exact equality and, on a
+ * mismatch, drops the open with no log line and no loss-report row, so a size wrong at all discards every donkey and
+ * mule chest without a trace.
  */
 class MountChestSlotsTest {
     // Vanilla's replaceItemInInventory addressing for a mount: 499 puts the chest on, 400 and 401 are the worn
@@ -60,8 +60,8 @@ class MountChestSlotsTest {
     void aMountThatArrivedAlreadyChestedReportsThoseFifteenSlotsToo() {
         EntityHorse donkey = new EntityHorse(HeadlessLevel.get());
         donkey.setType(HorseType.DONKEY);
-        // Vanilla sizes a mount's inventory once, when it is built, and never again for a flag that lands afterward,
-        // so the client holds a chested mount whose own inventory is still just the two worn slots.
+        // Vanilla sizes a mount's inventory when it is built, and never again for a flag that lands afterward, so the
+        // client holds a chested mount whose own inventory is still just the two worn slots.
         donkey.setChested(true);
 
         assertTrue(donkey.isChested(), "fixture: the synced flag reads chested");
@@ -141,7 +141,6 @@ class MountChestSlotsTest {
                 new HeadlessPlatformBridge(Paths.get(".")), null).captureChestSlots(menu, player);
         assertTrue(holder != null, "fixture: a chested mount menu must yield a holder");
 
-        // What the flush does: the mount's own saved tag, with only "Items" replaced by the captured holder.
         NBTTagCompound saved = donkey.writeToNBT(new NBTTagCompound());
         saved.setTag("Items", holder.getTagList("Items", 10));
         EntityHorse reloaded = new EntityHorse(HeadlessLevel.get());
@@ -165,7 +164,6 @@ class MountChestSlotsTest {
         WorldClient level = new WorldClient(connection,
                 new WorldSettings(0L, GameType.SURVIVAL, false, false, WorldType.DEFAULT),
                 0, EnumDifficulty.NORMAL, new Profiler());
-        // Only two abstract members reach the client singleton, and captureChestSlots touches neither.
         return new EntityPlayerSP(null, level, connection, new StatisticsManager()) {
             @Override
             public boolean isSpectator() {

@@ -26,8 +26,8 @@ class ContainerCaptureTest {
         ContainerCapture.putBrewingState(holder, 123, 7);
         assertEquals((short) 123, holder.getShort("BrewTime"));
         assertEquals((byte) 7, holder.getByte("Fuel"));
-        // The coercing getShortOr/getByteOr above would pass on a swapped short/byte too, so pin the on-disk
-        // tag type directly: vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
+        // The coercing getters above would pass on a swapped short/byte too, so pin the on-disk tag type directly:
+        // vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
         assertInstanceOf(NBTTagShort.class, holder.getTag("BrewTime"), "BrewTime must be a short tag");
         assertInstanceOf(NBTTagByte.class, holder.getTag("Fuel"), "Fuel must be a byte tag");
     }

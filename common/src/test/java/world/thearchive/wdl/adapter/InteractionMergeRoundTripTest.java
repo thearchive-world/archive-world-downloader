@@ -24,15 +24,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the band-stable merge write that interaction-prediction capture adds beside the open-time
- * container/lectern path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack#save}). It is the
- * capture-then-merge round-trip proven against vanilla's own read-back (the exact form the block entity's
- * {@code loadAdditional}/{@code load} uses): the captured content survives serialization, lands on the matching
- * captured block entity under its one key with no other field clobbered, decodes back to the same content, and only the
- * flushed chunk's stash entries drain. Server-free: real {@link ItemStack}s and hand-built chunk tags, no live client
- * and no {@code Level}.
- */
 class InteractionMergeRoundTripTest {
     @BeforeAll
     static void bootstrapVanilla() {
@@ -44,7 +35,6 @@ class InteractionMergeRoundTripTest {
         return blockEntity(id, x, y, z);
     }
 
-    /** Stamp an unrelated marker field onto the block entity at x/y/z, after the chunk tag's own fidelity check ran. */
     private static void markBlockEntity(NBTTagCompound chunkTag, int x, int y, int z, String marker) {
         findByPos(chunkTag, x, y, z).setString("wdl_test_marker", marker);
     }
@@ -54,7 +44,6 @@ class InteractionMergeRoundTripTest {
     }
 
     private static ItemStack readRecordItem(NBTTagCompound jukeboxBlockEntityTag) {
-        // vanilla JukeboxBlockEntity.loadAdditional's exact read
         ItemStack back = ItemStack.loadItemStackFromNBT(jukeboxBlockEntityTag.getCompoundTag("RecordItem"));
         assertNotNull(back, "the merged RecordItem must decode via vanilla's ItemStack.loadItemStackFromNBT");
         return back;
@@ -65,12 +54,12 @@ class InteractionMergeRoundTripTest {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(
                 taggedBlockEntity("RecordPlayer", 10, 70, 20),
-                taggedBlockEntity("Furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
+                taggedBlockEntity("Furnace", 11, 70, 20));
         markBlockEntity(chunkTag, 10, 70, 20, "keep-me");
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT)));
-        BlockPos elsewhere = new BlockPos(100, 70, 200); // a jukebox in a different chunk, not being flushed
+        BlockPos elsewhere = new BlockPos(100, 70, 200);
         stash.put(elsewhere, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_13)));
 
         int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
@@ -98,18 +87,14 @@ class InteractionMergeRoundTripTest {
 
         ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
 
-        // Vanilla JukeboxBlockEntity.tick spawns the note particles only while IsPlaying is set and a disc is
-        // present, so the captured holder marks the just-inserted disc playing.
         NBTTagCompound jukeboxBlockEntity = findByPos(
                 chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20);
-        assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
-                "the captured jukebox is marked playing so it shows note particles on load");
+        assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"), "the captured jukebox is marked playing");
     }
 
     @Test
     void mergeDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        // A jukebox, but in a different cell than the stashed pos
         NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("RecordPlayer", 2, 64, 1));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();

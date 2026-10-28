@@ -46,22 +46,8 @@ import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * How the session is wired to its per-loss log voices, which the voice's own test cannot see because it holds the voice
- * itself. Four joints. A streamed map write must speak through the voice the session holds for the whole download,
- * since a voice built per write attaches a stack per lost map, and a display wall's finish drain loses them five
- * figures at a time. The container-holder and the entity-item remap paths must hold voices of their own, since the
- * stack bound is per cause type per voice, so one shared voice lets a holder loss silence the stack of an unrelated
- * entity loss that happens to fail the same way. A voice must not outlive its download either, since the same bound
- * then spends the only stack of a cause on whichever download hit it first and leaves every download after it
- * stackless. And the three sites that still log directly rather than through a voice must keep the level their audience
- * reads them at: a lost map is a per-item soft loss at INFO, while the shared idcounts file is a once-per-download
- * fault at WARN.
- *
- * <p>The two remap paths are reached reflectively. They are private, and every production caller runs behind the client
- * singleton, so none of them runs headlessly: the flush pump reaches the drained-holder and entity-container paths, and
- * {@code finish()} reaches the ridden-mount fold directly, a sibling entry to the pump rather than a descendant of it.
- * The alternative is to pin the two voices only by their field identity, which would not notice a site rewired to the
- * other path's voice.
+ * The two remap paths are reached reflectively. The alternative is to pin the two voices only by their field identity,
+ * which would not notice a site rewired to the other path's voice.
  */
 class LiveCaptureSessionLossLogWiringTest {
     private static final String SESSION_LOGGER = LiveCaptureSession.class.getName();
@@ -70,15 +56,14 @@ class LiveCaptureSessionLossLogWiringTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // vanilla statics, which a test reaching a map write needs first
+        TestRegistries.bootstrap();
     }
 
     /**
-     * A session with no bound level, which is all the map paths need. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots; a test that turns either on
-     * leaves a session published there for the rest of the suite JVM, since only {@code finish()} clears it. The
-     * toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is on for
-     * both, so a silent key rename would arm every session this fixture builds.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots; a test that turns either on leaves a session published there, since only the finish path clears
+     * it. The toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is
+     * on for both, so a silent key rename would arm every session this fixture builds.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -94,12 +79,6 @@ class LiveCaptureSessionLossLogWiringTest {
                 () -> {});
     }
 
-    /**
-     * A writer whose region and entity storages are never opened, since a map write reaches disk through MapDataWriter
-     * and never through a region storage. The openers throw rather than returning a stub, but the writer thread turns a
-     * throw into a failed SaveResult, so a test that binds this must assert the result did not fail for the guard to
-     * have any force.
-     */
     private static AsyncSaveWriter mapOnlyWriter() {
         return new AsyncSaveWriter(
                 dimension -> {
@@ -112,19 +91,16 @@ class LiveCaptureSessionLossLogWiringTest {
                 new SaveProgress());
     }
 
-    /** A regular file where the {@code data/} directory belongs, so createDirectories throws for every write. */
     private static Path unwritableDataRoot(Path save) throws Exception {
         Files.createDirectories(save);
         Files.write(save.resolve("data"), "not a directory".getBytes(StandardCharsets.UTF_8));
         return save;
     }
 
-    /** An archive whose image resolver and data sink are both inert, so a test drives the session directly. */
     private static MapArchive stubArchive() {
         return new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {});
     }
 
-    /** An archive that fails every id resolution the same way, the deterministic remap loss both paths absorb. */
     private static MapArchive throwingArchive() {
         return new MapArchive(MapManifest.empty(), id -> {
             throw new IllegalStateException("the map image could not be read");
@@ -138,7 +114,6 @@ class LiveCaptureSessionLossLogWiringTest {
         return data;
     }
 
-    /** An encoded entity-chunk tag holding one entity whose displayed {@code "Item"} is {@code stack}. */
     private NBTTagCompound entityChunkDisplaying(UUID uuid, ItemStack stack) {
         NBTTagCompound entity = EntityFixtures.entity("ItemFrame", uuid);
         entity.setTag("Item", itemTagOf(stack));
@@ -218,11 +193,6 @@ class LiveCaptureSessionLossLogWiringTest {
         }
     }
 
-    /**
-     * Lose one item through each of the session's three voices, so what a download's first losses carry can be compared
-     * against a later download's. The map write is the real streaming path and lands on the writer thread, so the
-     * writer is drained before this returns and the three lines are in a settled order.
-     */
     private void loseOneItemThroughEachVoice(LiveCaptureSession session, Path save) throws Exception {
         MapArchive archive = throwingArchive();
         WorldPaths paths = new VersionAdapterImpl().worldPaths(unwritableDataRoot(save));
@@ -294,10 +264,6 @@ class LiveCaptureSessionLossLogWiringTest {
         }
     }
 
-    /**
-     * Close the finish batch, which production does only inside {@code finish()}, behind the client singleton the
-     * headless session does without.
-     */
     private static void closeTheFinishBatch(LiveCaptureSession session) {
         try {
             Field closed = LiveCaptureSession.class.getDeclaredField("finishBatchClosed");

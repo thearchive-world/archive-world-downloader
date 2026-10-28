@@ -1,10 +1,5 @@
 name: Release finalize (verify matrix, publish)
 
-# Turns the shared DRAFT GitHub release into a published one, run by the maintainer once every band's
-# release.yml run is green. It reads the declared matrix in release-matrix.txt, fails if any band-times-loader
-# jar is missing from the draft, sets the authored changelog section as the body, and publishes. Publishing
-# the draft is the only moment the release goes public and fires a release event, so an announcement webhook
-# fires once for the whole matrix. No publish secrets are needed, and Modrinth and CurseForge are untouched.
 on:
   workflow_dispatch:
     inputs:
@@ -27,11 +22,10 @@ defaults:
 jobs:
   finalize:
     runs-on: ubuntu-latest
-    # The announcement webhook is an environment secret rather than a repository one, which every collaborator
-    # with write access could read. It sits in its own environment instead of beside the publishing tokens: those
-    # are gated to release tags, and widening that gate to reach a branch-dispatched job would hand the platform
-    # credentials to anything running from a branch. This environment is gated to dev, which is the ref this
-    # workflow is dispatched on, and holds nothing but the webhook.
+    # The announcement webhook is an environment secret rather than a repository one, which every collaborator with
+    # write access could read. It sits in its own environment instead of beside the publishing tokens, which are gated
+    # to release tags. This environment is gated to dev, which is the ref this workflow is dispatched on, and holds
+    # nothing but the webhook.
     environment: announce
     timeout-minutes: 15
     steps:
@@ -40,10 +34,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # release-matrix.txt is the declared source of truth for the shipped band set, not inferred from the tags
-      # or branches that exist, because a forgotten band would silently shrink the expected set and pass an
-      # incomplete release. Loaders are read per band, so a later third loader is one manifest line, no logic
-      # change.
+      # release-matrix.txt is the declared source of truth for the shipped band set, not inferred from the tags or
+      # branches that exist, because a forgotten band would silently shrink the expected set and pass an incomplete
+      # release.
       - name: Verify the release carries the full matrix
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -79,8 +72,6 @@ jobs:
           fi
           echo "matrix complete: all ${#expected[@]} expected jars present in release '$VERSION'."
 
-      # The body is the authored changelog section for this version (a missing section fails here). draft=false
-      # is the single moment the release goes public and fires a release event.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,8 +102,6 @@ jobs:
             exit 0
           fi
           NOTES="$(awk -v v="$VERSION" '/^##[[:space:]]/ { if (inblk) exit; inblk = ($2 == v); next } inblk { print }' CHANGELOG.md)"
-          # Where to get it, appended below the notes. These are store fronts rather than release-specific links,
-          # so they are constant here rather than derived.
           LINKS="$(printf '%s\n' "" "**Get it**" \
             "- Modrinth: <https://modrinth.com/mod/wdl>" \
             "- CurseForge: <https://www.curseforge.com/minecraft/mc-mods/wdl>" \
@@ -121,8 +110,8 @@ jobs:
           # already published by this point, and a truncated announcement beats a red finalize.
           NOTES="$(printf '%s' "$NOTES" | head -c 3400)"
           NOTES="$(printf '%s\n%s' "$NOTES" "$LINKS")"
-          # No username or avatar_url: those override the webhook's own identity, which is configured in Discord
-          # where the name and icon belong. The payload carries only the announcement itself.
+          # No username or avatar_url: those override the webhook's own identity, which is configured in Discord where
+          # the name and icon belong.
           jq -n --arg t "Archive World Downloader $VERSION" \
                 --arg d "$NOTES" \
                 --arg u "https://github.com/$REPO/releases/tag/$VERSION" \

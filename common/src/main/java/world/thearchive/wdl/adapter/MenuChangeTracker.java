@@ -10,11 +10,9 @@ import net.minecraft.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tracks whether an open menu's slot contents (or the lectern's reading page) changed since the last stash, so the
- * per-tick last-seen-wins stash re-serializes only on a real change rather than every tick. The change signal is
- * per-slot stack identity and count: a client-side slot mutation either replaces the slot's stack object (a sync
- * packet's fresh stack, a click prediction's move or split) or changes its count (a prediction's grow or shrink).
- * Main-thread only, reset at bind and close so one open menu never inherits another's snapshot.
+ * The change signal is per-slot stack identity and count: a click or sync mutation of a slot either replaces the slot's
+ * stack object (a sync packet's fresh stack, a click prediction's move or split) or changes its count (a prediction's
+ * grow or shrink).
  */
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];
@@ -25,9 +23,8 @@ final class MenuChangeTracker {
     private int lastPage;
 
     /**
-     * Whether {@code slots} (or {@code page}) differ from the last snapshot; when they do, the snapshot advances to the
-     * current state, so a true return means "stash now". The first call after a reset is always a change (there is
-     * nothing to compare against, and the stash must run at least once).
+     * The first call after a reset is always a change (there is nothing to compare against, and the stash must run at
+     * least once).
      */
     boolean changedSince(List<Slot> slots, int page, int[] data) {
         @Nullable
@@ -49,7 +46,6 @@ final class MenuChangeTracker {
         return false;
     }
 
-    /** Drop the snapshot (and its strong stack references) so the next open starts fresh. */
     void reset() {
         lastStacks = null;
         lastCounts = null;

@@ -9,13 +9,9 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 
 /**
- * The classic-MCP walk over a serialized item tree, recursing into an item's nested item lists (the
- * {@code tag.BlockEntityTag.Items} list and the {@code tag.Items} list). Operates only on already-serialized NBT, never
- * a live ItemStack. Two views share the one recursion: {@link #walkList}/{@link #walkItem} hand the leaf each item's
- * {@code tag} compound (the item-borne coordinate scrub reaches its keys there), and {@link #forEachItem} hands the
- * leaf each item compound itself. At this band the filled-map id is the item-level {@code Damage}, not the inner
- * {@code tag}, so the map-id pass takes the item view; a filled map carries no {@code tag} at all and the tag view
- * would never see it. Each caller supplies its own per-item leaf action.
+ * Two views share the one recursion: {@link #walkList}/{@link #walkItem} hand the leaf each item's {@code tag}
+ * compound, and {@link #forEachItem} hands the leaf each item compound itself. At this band the filled-map id is the
+ * item-level {@code Damage}, not the inner {@code tag}, so the map-id pass takes the item view.
  */
 final class ItemTreeWalk {
     private static final String TAG = "tag";
@@ -24,10 +20,6 @@ final class ItemTreeWalk {
 
     private ItemTreeWalk() {}
 
-    /**
-     * Apply {@code onItem} to every item in {@code items} and its nested items. Each element is item NBT (with or
-     * without a leading {@code "Slot"}); a non-compound element is skipped.
-     */
     static void forEachItem(NBTTagList items, Consumer<NBTTagCompound> onItem) {
         for (NBTBase element : NbtElements.of(items)) {
             if (element instanceof NBTTagCompound) {
@@ -36,11 +28,6 @@ final class ItemTreeWalk {
         }
     }
 
-    /**
-     * Apply {@code onItem} to {@code item} and every item nested inside it ({@code tag.BlockEntityTag.Items} and
-     * {@code tag.Items}). The leaf sees the item compound itself, so a caller keying off the item-level {@code id} and
-     * {@code Damage} reaches them here.
-     */
     static void forEachItem(NBTTagCompound item, Consumer<NBTTagCompound> onItem) {
         onItem.accept(item);
         if (!(item.getTag(TAG) instanceof NBTTagCompound)) {
@@ -61,18 +48,10 @@ final class ItemTreeWalk {
         }
     }
 
-    /**
-     * Apply {@code onTag} to every item's {@code tag} compound in {@code items} and its nested items. Each element is
-     * item NBT (with or without a leading {@code "Slot"}); an item with no {@code tag} compound contributes nothing.
-     */
     static void walkList(NBTTagList items, Consumer<NBTTagCompound> onTag) {
         forEachItem(items, item -> acceptTag(item, onTag));
     }
 
-    /**
-     * Apply {@code onTag} to {@code item}'s {@code tag} compound and every nested item's {@code tag} compound. An item
-     * with no {@code tag} compound contributes nothing.
-     */
     static void walkItem(NBTTagCompound item, Consumer<NBTTagCompound> onTag) {
         forEachItem(item, nested -> acceptTag(nested, onTag));
     }

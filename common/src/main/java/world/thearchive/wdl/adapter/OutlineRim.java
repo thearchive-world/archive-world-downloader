@@ -10,16 +10,7 @@ import world.thearchive.wdl.core.MarkerHue;
 import world.thearchive.wdl.core.RimFace;
 
 /**
- * One container's rim in the outline draw-set: the hue its classification earned, the exposed {@link RimFace} it draws
- * on, the world-space shape box the rim's face plane sits on (the container's shape bounds, merged for a double chest,
- * or the live bounding box for a vehicle), the block-cell box the rim's in-plane rectangle spans (the full unit cell,
- * or two for a double chest, so a recessed model like a chest is framed at block extent), and the block pos keys of its
- * cells, which the tracker seals against each tick to recompute that face. An empty cells array marks an entity-borne
- * container, whose rim sits on its box top face (it has no block neighbors to seal), and whose cell box is that box.
- *
- * <p>The geometry (both boxes and the cells) is immutable, but the hue and face are settable so a cached
- * block-container rim can be reused across ticks: the tracker caches the rim's geometry per chunk and restamps its hue
- * from the live classification and its face from the seal test each tick. Touched only on the client thread.
+ * Touched only on the client thread.
  */
 public final class OutlineRim {
     private MarkerHue hue;
@@ -36,8 +27,8 @@ public final class OutlineRim {
     }
 
     /**
-     * The block-cell box: the union of unit cubes over the rim's cells (one cell, or two for a double chest), or the
-     * passed box itself when there are no cells (an entity rim, whose cell box is its bounding box).
+     * The block-cell box: the union of unit cubes over the rim's cells (one cell, or two for a double chest), so a
+     * recessed model like a chest is framed at block extent, or the passed box itself when there are no cells.
      */
     private static AxisAlignedBB cellBoxOf(AxisAlignedBB box, long[] cells) {
         if (cells.length == 0) {
@@ -65,7 +56,6 @@ public final class OutlineRim {
         return new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    /** Restamp the hue from this tick's classification (a cached rim is reused across ticks). */
     void hue(MarkerHue hue) {
         this.hue = hue;
     }
@@ -74,12 +64,11 @@ public final class OutlineRim {
         return hue;
     }
 
-    /** Restamp the exposed face from this tick's seal test (a cached rim is reused across ticks). */
     void face(RimFace face) {
         this.face = face;
     }
 
-    /** The exposed face the rim draws on, restamped each tick, or {@link RimFace#NONE} when fully enclosed. */
+    /** The exposed face the rim draws on, or {@link RimFace#NONE} when fully enclosed. */
     public RimFace face() {
         return face;
     }
@@ -88,17 +77,15 @@ public final class OutlineRim {
         return box;
     }
 
-    /** The block-cell box the rim's in-plane rectangle spans (full cell extent), as computed at cache time. */
+    /** The box the rim's in-plane rectangle spans. */
     public AxisAlignedBB cellBox() {
         return cellBox;
     }
 
-    /** The block pos keys of the container's one or two cells, or an empty array for an entity-borne rim. */
     long[] cells() {
         return cells;
     }
 
-    /** Whether this rim is entity-borne (an empty cells array) rather than a block container's. */
     public boolean isEntityRim() {
         return cells.length == 0;
     }

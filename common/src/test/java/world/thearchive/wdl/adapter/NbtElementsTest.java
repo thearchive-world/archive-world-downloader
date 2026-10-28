@@ -17,10 +17,6 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the two guarantees a walk site relies on without saying so: the view is repeatable, and the cursor throws past
- * the end instead of handing on the fresh NBTTagEnd that {@code NBTTagList.get} answers an out of range index with.
- */
 class NbtElementsTest {
     private static NBTTagList listOf(String... values) {
         NBTTagList list = new NBTTagList();

@@ -31,13 +31,8 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The container-map loss gate: a filled map nested in a chest and in a nested container item is collected and remapped
- * through the item-level {@code Damage} path, while a non-map item carrying its own {@code Damage} is left untouched.
- * At this band a filled map's id is the item-level {@code Damage} short behind the {@code id == "minecraft:filled_map"}
- * identity gate, not the inner {@code tag."map"} of the higher bands. Without the item-compound walk the maps are never
- * collected; without the identity gate the damaged pickaxe is rewritten as a map, corrupting its durability and
- * aliasing it to a captured map image. Each item entry comes from vanilla's own {@code ItemStack} writer, so the
- * item-level {@code Damage} short under test is the one a real stack serializes.
+ * Each item entry comes from vanilla's own {@code ItemStack} writer, so the item-level {@code Damage} short under test
+ * is the one a real stack serializes.
  */
 class ContainerMapCollectionTest {
     private static final String FILLED_MAP = "minecraft:filled_map";
@@ -66,7 +61,6 @@ class ContainerMapCollectionTest {
         return ItemFixtures.itemTag(container);
     }
 
-    /** A chest holder whose {@code Items} carry the chest map, the damaged pickaxe, and a container nesting a map. */
     private static NBTTagCompound holder(NBTTagCompound chestMap, NBTTagCompound pickaxe, NBTTagCompound nested) {
         NBTTagList items = new NBTTagList();
         items.appendTag(chestMap);
@@ -77,7 +71,6 @@ class ContainerMapCollectionTest {
         return holder;
     }
 
-    /** A synthetic serialized inner map data tag with the three hashed fields, distinct per {@code colorFill}. */
     private static NBTTagCompound picture(int colorFill) {
         byte[] colors = new byte[16384];
         Arrays.fill(colors, (byte) colorFill);

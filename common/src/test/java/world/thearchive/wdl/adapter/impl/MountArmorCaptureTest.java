@@ -30,13 +30,13 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the mount slot-1 write: a horse's armor. It is a real stack in the mount's own inventory slot
- * 1, a container the server never sends, so vanilla's writer finds the slot empty and an armored mount archives bare.
+ * A horse's armor is a real stack in the mount's own inventory slot 1, a container the client never fills, so vanilla's
+ * writer finds the slot empty and an armored mount archives bare.
  *
  * <p>Every fixture leaves that slot EMPTY and reaches the synced source instead, and that is the whole point: a mount
  * armored the ordinary way carries the key from vanilla's own writer, so a slot-1 fixture would pass with this class's
  * production code deleted. Live-entity tests drive {@code encodeChunk} and {@code captureRootVehicle}, so removing
- * either call site in {@link EntitySinkImpl} reddens one of them; the tag-level tests pin the on-disk contract.
+ * either call site in {@link EntitySinkImpl} reddens one of them.
  */
 class MountArmorCaptureTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -46,7 +46,7 @@ class MountArmorCaptureTest {
         TestRegistries.bootstrap();
     }
 
-    /** The capture reads only the synced tier, so a named armor archives plain: the accepted residual, pinned here. */
+    /** The capture reads only the synced tier, so a named armor archives plain. */
     @Test
     void anArmoredHorseIsWrittenWithThePlainArmorOfItsSyncedTier() {
         ItemStack armor = new ItemStack(Items.DIAMOND_HORSE_ARMOR);
@@ -78,11 +78,6 @@ class MountArmorCaptureTest {
         assertFalse(saved.hasKey("ArmorItem"), "a bare horse must not be given armor it never wore");
     }
 
-    /**
-     * A mount riding something else reaches disk only as a nested compound, because the entities path refuses a
-     * passenger its own entry. A plain minecart picks up a parked mount with no size gate, which is the ordinary way
-     * this state arises in play.
-     */
     @Test
     void anArmoredMountNestedUnderItsVehicleIsWrittenArmoredToo() {
         EntityMinecartEmpty cart = new EntityMinecartEmpty(HeadlessLevel.get());
@@ -114,8 +109,7 @@ class MountArmorCaptureTest {
 
     /**
      * Vanilla drops any passenger whose own save it refuses, so the saved list is shorter than the live one and the two
-     * cannot be indexed in lockstep. Both mounts are armored, and differently, so a stamp walking either list by
-     * position writes the wrong armor rather than none.
+     * cannot be indexed in lockstep.
      */
     @Test
     void anArmoredMountIsFoundByUuidWhenAnEarlierPassengerIsDroppedFromTheSavedList() {
@@ -172,7 +166,7 @@ class MountArmorCaptureTest {
     /** A real horse in the exact state a client holds: the synced armor tier set, inventory slot 1 still empty. */
     private static EntityHorse armoredHorse(ItemStack armor) {
         EntityHorse horse = new EntityHorse(HeadlessLevel.get());
-        horse.setHorseArmorStack(armor); // writes only the synced tier and stack, never the inventory
+        horse.setHorseArmorStack(armor); // writes only the synced tier, never the inventory
         assertFalse(HorseArmorType.NONE == horse.getHorseArmorType(),
                 "fixture: the client must see this horse wearing armor");
         assertTrue(mountSlotOneIsEmpty(horse),
@@ -180,11 +174,6 @@ class MountArmorCaptureTest {
         return horse;
     }
 
-    /**
-     * Whether the mount's own inventory slot 1 is empty. This band exposes no public reader for that container, so the
-     * private field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
-     * writer emit the key.
-     */
     private static boolean mountSlotOneIsEmpty(EntityHorse mount) {
         try {
             Field field = EntityHorse.class.getDeclaredField("horseChest");

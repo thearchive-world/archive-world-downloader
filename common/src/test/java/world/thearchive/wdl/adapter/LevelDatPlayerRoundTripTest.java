@@ -30,21 +30,12 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the player-data level.dat apply: {@link LevelDataWriter#save} with a {@link CapturedPlayer}
- * routes the captured tag into the {@code "Player"} slot, flips {@code GameType}, sets the world spawn ({@code
- * SpawnX}/{@code SpawnY}/{@code SpawnZ}) to the capture position, marks the level data {@code initialized} so vanilla
- * keeps that spawn on first open, and writes the captured {@code Difficulty}; with a {@code null} {@code
- * CapturedPlayer} the output is today's void world (no {@code Player}, default spawn, {@code initialized}, {@code
- * SURVIVAL}). Driven through the real production {@code ISaveHandler.saveWorldInfoWithPlayer}, so the headless suite
- * guards the band-specific save call.
- */
 class LevelDatPlayerRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     private static NBTTagCompound capturedPlayerTag() {
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setString("wdlMarker", "captured-player"); // a sentinel proving this exact tag lands in the Player slot
+        tag.setString("wdlMarker", "captured-player");
         tag.setTag("Inventory", new NBTTagList());
         return tag;
     }
@@ -123,7 +114,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         NBTTagCompound playerTag = capturedPlayerTag();
         UUID vehicle = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound vehicleTag = EntityFixtures.entityTag("EntityHorse"); // the id loadEntityRecursive reads
+        NBTTagCompound vehicleTag = EntityFixtures.entityTag("EntityHorse");
         PlayerTag.setRootVehicle(playerTag, vehicle, vehicleTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ORIGIN, 0.0F, 0.0F,
                 DimensionType.OVERWORLD, GameType.CREATIVE, EnumDifficulty.NORMAL);

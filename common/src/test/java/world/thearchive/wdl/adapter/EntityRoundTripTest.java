@@ -27,32 +27,9 @@ import world.thearchive.wdl.adapter.impl.WorldPathsImpl;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for entity capture at this band: the {@link EntitySink} pure carrier slice
- * ({@link EntitySink#encodeChunk(List, ChunkPos)} over already-serialized entity tags) folded into a {@code region/}
- * chunk under {@code Level.Entities} through {@link RegionChunkWriter#foldEntitiesIntoRegion} is a self-consistent,
- * vanilla-valid Anvil round-trip: the {@code Entities} list survives inside the host chunk with each entity's
- * {@code id}. At 1.10.2 there is no separate {@code entities/} region (that is 1.17 and above); entities live in the
- * chunk itself.
- *
- * <p>Server-free by construction: hand-built entity tags drive the carrier, so neither a live {@code Entity} nor a
- * {@code Level} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
- * ({@link ChunkRoundTripTest}):
- * <ul>
- * <li>the live {@code entity.save(NBTTagCompound)} serialization needs a real {@code Entity}; and</li>
- * <li>{@code EntityType.loadEntityRecursive} parse-back needs a {@code Level}.</li>
- * </ul>
- * This test proves the in-chunk carrier + region IO self-consistency.
- */
 class EntityRoundTripTest {
     private final EntitySink sink = new EntitySinkImpl();
 
-    /**
-     * Initialize vanilla's static state (versioned constants + built-in registries) so {@code ChunkPos},
-     * {@code DataFixers}, and the region pipeline are usable headless. The pure carrier is itself registry-free; we
-     * reuse the project's memoized bootstrap (not its {@code RegistryAccess}) only so this test is self-sufficient when
-     * run in isolation.
-     */
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();
@@ -69,7 +46,6 @@ class EntityRoundTripTest {
         return host;
     }
 
-    /** A minimal stand-in for a serialized entity tag: an {@code id} (its type) plus a placement marker. */
     private static NBTTagCompound entityTag(String id, int marker) {
         NBTTagCompound tag = EntityFixtures.entityTag(id);
         tag.setInteger("wdlMarker", marker);
@@ -100,8 +76,7 @@ class EntityRoundTripTest {
         WorldPaths paths = new WorldPathsImpl(save);
         Path regionDirectory = paths.regionDirectory(DimensionType.OVERWORLD);
 
-        // Same boundary set the chunk path covers: (0,0)+(31,31) share r.0.0; the others cross into
-        // r.1.0 / r.0.1 / r.-1.-1. A distinct marker per entity proves each lands in its own chunk.
+        // (0,0)+(31,31) share r.0.0; the others cross into r.1.0 / r.0.1 / r.-1.-1.
         List<ChunkPos> positions = ImmutableList.of(
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
@@ -109,7 +84,7 @@ class EntityRoundTripTest {
         try (WdlRegionStorage out = regionStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
                 ChunkPos pos = positions.get(i);
-                out.write(pos, hostChunk()); // the host chunk the entities fold into
+                out.write(pos, hostChunk());
                 NBTTagCompound carrier = sink.encodeChunk(ImmutableList.of(entityTag("Item", i)), pos);
                 RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier,
                         null);
@@ -118,7 +93,6 @@ class EntityRoundTripTest {
             }
         }
 
-        // Reopen with a FRESH storage and read every entity back from its chunk's Level.Entities.
         try (WdlRegionStorage in = regionStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
                 NBTTagCompound back = Optional.ofNullable(in.read(positions.get(i)))

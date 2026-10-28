@@ -9,11 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.Test;
 
-/**
- * The pack and unpack round-trip for the section-key bit scheme, the {@code SectionPos} stand-in at this band. The
- * producer packs a section and the per-band renderer unpacks it through this one class, so the encode and decode must
- * not drift: every section coordinate in the 22/20/22-bit signed range recovers exactly, sign included.
- */
 class SectionKeyTest {
     // The signed extents of the packed fields: x and z are 22 bits, y is 20 bits.
     private static final int[] XZ = { 0, 1, -1, 42, -42, (1 << 21) - 1, -(1 << 21) };

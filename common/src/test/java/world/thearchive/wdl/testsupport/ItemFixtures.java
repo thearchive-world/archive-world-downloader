@@ -15,25 +15,11 @@ import net.minecraft.util.text.TextComponentString;
 
 import world.thearchive.wdl.adapter.impl.ItemListNbt;
 
-/**
- * Item NBT built by the writers rather than by hand: {@link ItemListNbt#saveAllItems} for an {@code "Items"} list and
- * {@code ItemStack#writeToNBT} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
- *
- * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: the writer always emits
- * {@code "Slot"} and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under
- * test sees every entry collapsed onto one slot.
- */
 public final class ItemFixtures {
     private ItemFixtures() {}
 
     /**
      * The stack for {@code itemId}, count 1.
-     *
-     * <p>An unregistered id is rejected rather than resolved: {@code Item.REGISTRY.getObject} returns {@code null} for
-     * an id the registry does not hold, and a null item would build an empty stack, since the vanilla writer skips
-     * empty stacks the fixture would come back as an empty list that this gate then accepts, an empty list being its
-     * own round trip. That is the degenerate fixture the gate exists to reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = new ResourceLocation(itemId);
@@ -79,12 +65,10 @@ public final class ItemFixtures {
         return holder(slots, stacks).getTagList("Items", 10);
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */
     public static NBTTagCompound itemsHolder(String... itemIds) {
         return itemsHolder(stacks(itemIds));
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code stacks} at ascending slots from 0. */
     public static NBTTagCompound itemsHolder(ItemStack... stacks) {
         return holder(ascending(stacks.length), stacks);
     }
@@ -96,8 +80,7 @@ public final class ItemFixtures {
 
     /**
      * An {@code "Items"} entry with no {@code "Slot"}, which vanilla never writes but a corrupted or foreign save can
-     * hold, and which its decode silently lands on slot 0. Only for a case whose subject is that entry; a fixture
-     * standing in for producer output belongs on {@link #entryAtSlot}.
+     * hold, and which its decode silently lands on slot 0.
      */
     public static NBTTagCompound malformedEntryWithoutSlot(String itemId) {
         NBTTagCompound entry = entryAtSlot(0, itemId);
@@ -105,15 +88,13 @@ public final class ItemFixtures {
         return entry;
     }
 
-    /** The tag vanilla writes for a single stored stack, as a lectern's {@code "Book"} carries it. */
+    /** The tag vanilla writes for a single stored stack. */
     public static NBTTagCompound itemTag(String itemId) {
         return itemTag(stack(itemId));
     }
 
     /**
-     * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
-     * carries it: {@code ItemStack#writeToNBT}, the same call every block-entity single-stack field uses (a
-     * {@code {id, Count, tag}} compound with {@code Count} as a byte).
+     * The tag vanilla writes for {@code stack}, as a jukebox's {@code "RecordItem"} carries it.
      */
     public static NBTTagCompound itemTag(ItemStack stack) {
         return stack.writeToNBT(new NBTTagCompound());
@@ -121,9 +102,8 @@ public final class ItemFixtures {
 
     /**
      * A written book of {@code pageCount} pages, already marked {@code resolved} so the fixture stands in for a book a
-     * player has opened. The page count is load-bearing wherever a lectern's {@code "Page"} matters: vanilla clamps the
-     * saved page into the book's own page range, so a book with no pages can only ever be on page -1. Each page is a
-     * JSON-encoded text component string, the shape {@code ItemWrittenBook.resolveContents} leaves behind.
+     * player has opened. Each page is a JSON-encoded text component string, the shape
+     * {@code ItemWrittenBook.resolveContents} leaves behind.
      */
     public static ItemStack writtenBook(int pageCount) {
         NBTTagList pages = new NBTTagList();

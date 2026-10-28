@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiIngameMenu;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.ClientCommandHandler;
@@ -29,14 +28,8 @@ import world.thearchive.wdl.platform.AbstractPlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
 /**
- * Forge implementation of {@link world.thearchive.wdl.platform.PlatformBridge PlatformBridge}. Below the ModLauncher
- * boundary Forge carries one event bus, not a mod bus split from a game bus: {@code MinecraftForge.EVENT_BUS} is the
- * pre-ModLauncher {@code net.minecraftforge.fml.common.eventhandler.EventBus}, which dispatches only to
- * {@code @SubscribeEvent}-annotated instance methods discovered by {@code register(Object)}, not to a lambda (there
- * is no functional {@code addListener} overload at this band), so this bridge registers itself once and every
- * {@code Runnable} the loader-agnostic caller hands it (one per keybind press, one per tick-end/connect/disconnect
- * subscriber) is polled from the single shared tick listener below rather than becoming its own listener.
- * {@code isRemoteWorld} and {@code sendChat} are pure-vanilla and inherited from {@link AbstractPlatformBridge}.
+ * {@code MinecraftForge.EVENT_BUS} dispatches to {@code @SubscribeEvent}-annotated instance methods discovered by
+ * {@code register(Object)}, so this bridge registers itself once.
  */
 final class ForgePlatformBridge extends AbstractPlatformBridge {
     private final List<KeyBinding> keys = new ArrayList<>();
@@ -55,7 +48,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
         MinecraftForge.EVENT_BUS.register(this);
     }
 
-    /** The mapping registers immediately; there is no separate client-setup event to defer it to at this band. */
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
         KeyBinding key = new KeyBinding(keyId, Keyboard.KEY_NONE, WdlKeyBinds.CATEGORY);
@@ -82,9 +74,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
                 .forEach(event.getButtonList()::add);
     }
 
-    // The pause-menu row's buttons carry their own action; below the 1.13 GUI rewrite a GuiButton has no onPress
-    // callback, so the click arrives here through the vanilla screen's action-performed path and is dispatched off
-    // the button identity.
     @SubscribeEvent
     public void onActionPerformed(GuiScreenEvent.ActionPerformedEvent.Pre event) {
         if (event.getButton() instanceof WdlMenuButton) {
@@ -113,15 +102,14 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * The one edge ahead of the loader's registry revert. Minecraft.loadWorld posts WorldEvent.Unload at its head and
-     * calls FMLClientHandler.handleClientWorldClosing, which reverts the registries on any non-local connection, later
-     * in that same method on that same thread, and nothing between the two runs a client tick. So the disconnect
-     * callbacks above, which ride the tick edge, cannot reach a subscriber until the revert is over, and this can.
+     * The one edge ahead of the loader's registry revert. {@code Minecraft.loadWorld} posts {@code WorldEvent.Unload}
+     * at its head and calls {@code FMLClientHandler.handleClientWorldClosing}, which reverts the registries on any
+     * non-local connection, later in that same method on that same thread, and nothing between the two runs a client
+     * tick. So the disconnect callbacks above, which ride the tick edge, cannot reach a subscriber until the revert is
+     * over, and this can.
      *
-     * <p>Gated on the client's own world: with an integrated server running, the server thread posts this event for
-     * its worlds too, and a callback taken there would reach the capture off the client thread it belongs to. Firing
-     * on a dimension change as well is deliberate and harmless: a subscriber reads the connection state and does
-     * nothing there, a dimension change reverting nothing.
+     * <p>Gated on the client's own world: with an integrated server running, the server thread posts this event for its
+     * worlds too, and a callback taken there would reach the capture off the client thread it belongs to.
      */
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
@@ -134,12 +122,10 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * The one client-tick-end listener this bridge needs: polls every registered keybind, runs the plain
-     * tick-end callbacks, then detects the connection edge off {@code Minecraft.getMinecraft().getConnection()},
-     * which is null until the local player is assigned and stays non-null across a dimension change, so its null
-     * edge is the once-per-connection join and disconnect signal. This band does carry the legacy-FML
-     * ClientConnectedToServerEvent/ClientDisconnectionFromServerEvent pair, but the tick-edge probe is the
-     * loader-uniform mechanism the shared wiring already relies on, so the join and disconnect callbacks ride it.
+     * The one client-tick-end listener this bridge needs: polls every registered keybind, runs the plain tick-end
+     * callbacks, then detects the connection edge off {@code Minecraft.getMinecraft().getConnection()}, which is null
+     * until the local player is assigned and stays non-null across a dimension change, so its null edge is the
+     * once-per-connection join and disconnect signal.
      */
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
@@ -198,10 +184,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
         return Loader.isModLoaded(modId);
     }
 
-    // The two spectator-click observation booleans below carry the fork parent's 1.16-era rationale (citing
-    // MultiPlayerGameMode/ForgeHooks.onRightClickBlock, classes that do not exist at this band under those names)
-    // and are unverified for this band's own PlayerControllerMP/ForgeHooks interact patch; left at their inherited
-    // values rather than guessed, pending re-verification against this band's actual patched interact path once the seam is ported.
     @Override
     public boolean observesSpectatorBlockClick() {
         return true;
@@ -212,12 +194,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
         return false;
     }
 
-    /**
-     * Register the client-side {@code /wdl} command through Forge's {@link ClientCommandHandler}, so it runs on a
-     * foreign server: a client command dispatches locally and never reaches the remote server's command tree. Below the
-     * 1.13 command rewrite the command is a classic {@code ICommand} rather than a Brigadier tree, built by the shared
-     * bridge helper.
-     */
     @Override
     public void registerCommands(WdlCommands commands) {
         ClientCommandHandler.instance.registerCommand(wdlCommand(commands));

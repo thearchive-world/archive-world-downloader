@@ -13,14 +13,6 @@ import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.storage.WorldInfo;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A do-nothing {@link World} for headless fixtures. The {@code EntityLiving} constructor binds a world, so a mob cannot
- * be built against a null one; this supplies a real {@code WorldProvider} and a fresh profiler through the 1.10.2
- * {@code World} constructor, with a null save handler and inert stubs for its two abstract members.
- *
- * <p>A test that reads a per-dimension provider flag must go through {@link #get(DimensionType)} and must not stub the
- * provider, or it asserts the mod's own reading of that flag against itself.
- */
 public final class HeadlessLevel extends World {
     private HeadlessLevel(DimensionType dimension) {
         super(null,

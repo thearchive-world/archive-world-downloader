@@ -15,15 +15,6 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.storage.RegionFile;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The synchronous region store at this band: there is no {@code IOWorker} and no {@code RegionFileStorage} base, so
- * this owns the region-file cache directly the way vanilla {@code RegionFileCache} does, one {@link RegionFile} per
- * region coordinate opened on demand and reused. It is deliberately the raw NBT layer (no data fixing, matching the
- * higher band's raw {@code RegionFileStorage.read}/{@code write}): a chunk tag is written through the region file
- * exactly as given and read back verbatim, so what reaches disk is the anvil format a vanilla client of this band
- * reads. Below 1.15 the pre-{@code IOWorker} region path calls no {@code force()} at all, so a finished write survives
- * the process dying but not a mid-write power loss.
- */
 public class WdlRegionStorage implements AutoCloseable {
     private final File directory;
     private final Long2ObjectMap<RegionFile> regionCache = new Long2ObjectOpenHashMap<>();
