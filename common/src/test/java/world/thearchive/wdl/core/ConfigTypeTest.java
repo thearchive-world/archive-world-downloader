@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
-/** The closed value-type classifier: each type's parse (with clamp/malformed/blank rules) and canonical format. */
 class ConfigTypeTest {
     private static final Function<WdlConfig, Object> accessor = config -> Boolean.TRUE;
 

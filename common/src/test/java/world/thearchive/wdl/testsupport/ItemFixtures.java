@@ -24,15 +24,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.storage.TagValueOutput;
 
-/**
- * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack.CODEC} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
- *
- * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
- * and {@code "count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
- * every entry collapsed onto one slot.
- */
 public final class ItemFixtures {
     private static final Identifier AIR_ID = Identifier.parse("minecraft:air");
 
@@ -43,8 +34,7 @@ public final class ItemFixtures {
      *
      * <p>An unregistered id is rejected rather than resolved. {@code BuiltInRegistries.ITEM} is a defaulted registry,
      * so a typo returns air, an air stack is empty, and the vanilla writer skips empty stacks: the fixture would come
-     * back as an empty list that this gate then accepts, since an empty list is its own round trip. That is the
-     * degenerate fixture the gate exists to reject, arriving through the builder.
+     * back as an empty list that {@link FixtureFidelity} then accepts, since an empty list is its own round trip.
      */
     public static ItemStack stack(String itemId) {
         Identifier id = Identifier.parse(itemId);
@@ -83,12 +73,10 @@ public final class ItemFixtures {
         return holder(slots, stacks).getListOrEmpty("Items");
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */
     public static CompoundTag itemsHolder(String... itemIds) {
         return itemsHolder(stacks(itemIds));
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code stacks} at ascending slots from 0. */
     public static CompoundTag itemsHolder(ItemStack... stacks) {
         return holder(ascending(stacks.length), stacks);
     }
@@ -100,8 +88,7 @@ public final class ItemFixtures {
 
     /**
      * An {@code "Items"} entry with no {@code "Slot"}, which vanilla never writes but a corrupted or foreign save can
-     * hold, and which its decode silently lands on slot 0. Only for a case whose subject is that entry; a fixture
-     * standing in for producer output belongs on {@link #entryAtSlot}.
+     * hold, and which its decode silently lands on slot 0.
      */
     public static CompoundTag malformedEntryWithoutSlot(String itemId) {
         CompoundTag entry = entryAtSlot(0, itemId);
@@ -124,9 +111,7 @@ public final class ItemFixtures {
     }
 
     /**
-     * A written book of {@code pageCount} pages. The page count is load-bearing wherever a lectern's {@code "Page"}
-     * matters: vanilla clamps the saved page into the book's own page range, so a book with no pages can only ever be
-     * on page -1.
+     * A written book of {@code pageCount} pages.
      */
     public static ItemStack writtenBook(int pageCount) {
         List<Filterable<Component>> pages = new ArrayList<>();

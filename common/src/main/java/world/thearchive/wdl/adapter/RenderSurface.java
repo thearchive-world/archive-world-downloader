@@ -8,14 +8,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.network.chat.Component;
 
-/**
- * The client draw seam: the band-stable subset of the vanilla GUI surface that shared client code draws through, so
- * {@code client/} names no vanilla draw-surface type. One implementation per band in {@code adapter/impl} wraps that
- * band's concrete surface, which is the type that moves across the version bands. The interface may name band-stable
- * vanilla types ({@link Font}, {@link Component}) on the same license {@code adapter/} already has, but never the draw
- * surface itself and never the resource-id type, which is why a sprite is addressed by a mod-owned key that the plug
- * resolves rather than by a vanilla id.
- */
 public interface RenderSurface {
     /** Draw a string with a drop shadow. */
     void text(Font font, String text, int x, int y, int color);
@@ -35,7 +27,7 @@ public interface RenderSurface {
     /** Draw a one-pixel outline around an axis-aligned rectangle in an ARGB color. */
     void outline(int x, int y, int width, int height, int color);
 
-    /** Draw a mod-owned atlas sprite tinted by an ARGB color, named by its {@code wdl}-namespace path. */
+    /** Draw a mod-owned sprite tinted by an ARGB color, named by its {@code wdl}-namespace path. */
     void blitSprite(String sprite, int x, int y, int width, int height, int color);
 
     /** Draw a square world favicon. */
@@ -44,7 +36,7 @@ public interface RenderSurface {
     /** Show a tooltip that wraps {@code content} at {@code wrapWidth}, anchored at the cursor. */
     void tooltip(Font font, Component content, int wrapWidth, int mouseX, int mouseY);
 
-    /** Show a tooltip of discrete lines, one per component, anchored at the cursor. */
+    /** Show a tooltip of discrete lines, anchored at the cursor. */
     void tooltip(Font font, List<Component> lines, int mouseX, int mouseY);
 
     /** The framebuffer width in GUI-scaled pixels. */

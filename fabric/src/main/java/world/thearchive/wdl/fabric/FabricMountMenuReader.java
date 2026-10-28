@@ -10,13 +10,9 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.MountMenuReader;
 
-/**
- * The Fabric mount-menu read: {@link MountMenuReader}'s seam plus the one non-public read it needs, made reachable by
- * the Fabric access widener (the mount-inventory menu's mount).
- */
 final class FabricMountMenuReader extends MountMenuReader {
     @Override
     protected @Nullable Entity mount(AbstractContainerMenu menu) {
-        return menu instanceof AbstractMountInventoryMenu mountMenu ? mountMenu.mount : null; // widened
+        return menu instanceof AbstractMountInventoryMenu mountMenu ? mountMenu.mount : null;
     }
 }

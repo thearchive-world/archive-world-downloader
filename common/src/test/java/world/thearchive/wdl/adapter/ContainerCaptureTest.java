@@ -57,7 +57,7 @@ class ContainerCaptureTest {
         crafting.setItem(0, new ItemStack(Items.STICK, 2));
         crafting.setItem(4, new ItemStack(Items.DIAMOND, 1));
         SimpleContainer result = new SimpleContainer(1);
-        result.setItem(0, new ItemStack(Items.EMERALD, 64)); // the recipe preview, container index 0
+        result.setItem(0, new ItemStack(Items.EMERALD, 64));
 
         List<Slot> slots = new ArrayList<>();
         for (int i = 0; i < 9; i++) {
@@ -94,7 +94,7 @@ class ContainerCaptureTest {
         SimpleContainer crafting = new SimpleContainer(9);
         SimpleContainer other = new SimpleContainer(1);
         List<Slot> slots = new ArrayList<>();
-        slots.add(new Slot(other, 0, 0, 0)); // only a non-crafting slot backs the menu
+        slots.add(new Slot(other, 0, 0, 0));
         assertNull(ContainerCapture.selectCrafterInputs(slots, crafting));
     }
 }

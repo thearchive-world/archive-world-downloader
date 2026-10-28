@@ -31,11 +31,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.BadStacks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The unit-level guard for {@link ItemStackSanitizer} itself, exercising the repair policy directly rather than through
- * an entity or a merchant offer. A level-0 enchantment has no in-memory route, so those fixtures come from
- * {@link BadStacks#enchantments}.
- */
 class ItemStackSanitizerTest {
     @BeforeAll
     static void bootstrapVanilla() {

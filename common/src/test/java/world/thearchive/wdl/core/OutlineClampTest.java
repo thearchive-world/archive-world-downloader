@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/** The pure distance clamp: a container is a candidate only within the camera-centered outline distance. */
 class OutlineClampTest {
     @Test
     void includesContainerInsideTheClamp() {

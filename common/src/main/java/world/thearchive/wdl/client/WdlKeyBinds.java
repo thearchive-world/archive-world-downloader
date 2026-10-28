@@ -7,11 +7,9 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 
 /**
- * The mod's shared keybind category (the "Archive World Downloader" controls heading), registered once and reused by
- * every wdl keybind on both loaders. One shared Category instance is required rather than merely a shared id: the
- * vanilla controls list groups consecutive mappings by category reference identity, so two distinct records carrying
- * the same id would each open their own duplicate heading. The heading label resolves the key.category.wdl.downloader
- * translation key, which this id derives.
+ * One shared {@code Category} instance is required rather than merely a shared id: the vanilla controls list groups
+ * consecutive mappings by category reference identity, so two distinct records carrying the same id would each open
+ * their own duplicate heading.
  */
 public final class WdlKeyBinds {
     // Fabric has no category-registration event, so the vanilla register is the only cross-loader path and this

@@ -26,19 +26,10 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * Chested-animal container axis: a donkey's chest binds on the entity's UUID and merges onto the animal's tag in the
- * {@code entities/} region. The chest syncs only through the open inventory, and a tamed chested animal opens its
- * inventory on a secondary-use (sneaking) interact, so the drive holds the sneak key before interacting. The animal is
- * summoned with {@code NoAI} so the crosshair can be aimed at it, and the diamond is planted in chest inventory slot 0
- * (the menu exposes the chest from slot index 2, after the saddle and body-armor slots).
- *
- * <p>What both scenarios actually cover is the menu-derived bind: {@code MountMenuReader} reads the animal the
- * mount-screen packet named, so the bind depends on neither the crosshair nor the ridden vehicle. Neither scenario
- * exercises click provenance, and that is worth knowing rather than assuming: both drive their interact through
- * {@code MultiPlayerGameMode} directly, which this loader's use hook does not observe (it fires from a
- * {@code Minecraft.startUseItem} mixin), so the intent chain stays empty for the whole run and the bind rests entirely
- * on the reader. Nor do they cover the dispatch's branch order against the vehicle path; that conflict needs a
- * container vehicle as the resolved target while a mount menu arrives, which no vanilla action here produces.
+ * The chest syncs only through the open inventory, and a tamed chested animal opens its inventory on a secondary-use
+ * (sneaking) interact, so the drive holds the sneak key before interacting. The animal is summoned with {@code NoAI} so
+ * the crosshair can be aimed at it, and the diamond is planted in chest inventory slot 0 (the menu exposes the chest
+ * from slot index 2, after the saddle and body-armor slots).
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
@@ -57,11 +48,11 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
                     client.player.getBoundingBox().inflate(8)).stream()
                     .anyMatch(AbstractChestedHorse.class::isInstance));
 
-            // A reconnect earlier in a multi-scenario run can leave a confirm screen focused, and an open screen
-            // suppresses keybind input, so dismiss it before holding sneak or the interact never registers as one.
+            // An open screen suppresses keybind input, so dismiss it before holding sneak or the interact never
+            // registers as one.
             context.runOnClient(client -> client.gui.setScreen(null));
             context.getInput().holdKey(options -> options.keyShift);
-            context.waitTicks(3); // let the sneak state reach the server before the interact (secondary-use gate)
+            context.waitTicks(3);
             Vec3 animalCenter = new Vec3(animalX, animalY + 0.75, animalZ);
             ContainerDriver.aimEyesAt(context, animalCenter);
             ContainerDriver.awaitCrosshair(context, WdlChestedAnimalCaptureTest::isLookingAtAnimal, "donkey");
@@ -104,16 +95,8 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * Second scenario: the ridden mount's chest binds with no click provenance of any kind. The open is requested the
-     * way vanilla's inventory key requests it, which fires no use event, and the resolve therefore hands the bind an
-     * empty target; only the menu's own name for its mount can produce the right animal. Break {@code MountMenuReader}
-     * or its install and this goes red, because the mount menu then falls through to the block axis with no block and
-     * drops. The ridden mount saves as the player's {@code RootVehicle} in level.dat rather than into the entities
-     * region, which is where the assertion looks.
-     *
-     * <p>A same-size decoy animal under the crosshair used to sit here as a mis-bind guard. It was retired once the
-     * crosshair stopped reaching this bind at all: with the target empty and the animal read from the menu, no
-     * expression in scope could name the decoy, so the assertion could not fail and pinned nothing.
+     * The ridden mount saves as the player's {@code RootVehicle}, which is where the assertion looks, rather than into
+     * the entities region.
      */
     private static void captureRiddenAnimal(ClientGameTestContext context, double mountX, double mountY,
             double mountZ) {
@@ -126,7 +109,6 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             EntityHitResult hit = (EntityHitResult) client.hitResult;
-            // Not sneaking, so a tamed chested animal rides rather than opening its inventory.
             client.gameMode.interact(client.player, hit.getEntity(), hit, InteractionHand.MAIN_HAND);
         });
         context.waitFor(client -> client.player.getVehicle() instanceof AbstractChestedHorse);
@@ -135,9 +117,6 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
                 new DownloadTarget("wdl-ridden-chested-animal", "wdl-ridden-chested-animal", DownloadMode.NEW),
                 WdlConfig.DEFAULTS);
         run.tick(5);
-        // The packet vanilla's inventory key sends, not the key itself: a chested mount is not an eligible
-        // vehicle intent either way, so this open reaches the bind with an empty target, which is the state
-        // the scenario exists to cover.
         context.runOnClient(client -> client.player.sendOpenInventory());
         ContainerDriver.awaitMenuReady(context, run,
                 client -> client.player.containerMenu instanceof HorseInventoryMenu menu
@@ -152,7 +131,6 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
                 "the ridden donkey's chest is absent from the saved RootVehicle: " + mountItems);
     }
 
-    /** Whether the client's crosshair is resolved onto a chested animal (the chested-animal bind precondition). */
     private static boolean isLookingAtAnimal(Minecraft client) {
         return client.hitResult instanceof EntityHitResult entityHit
                 && entityHit.getType() == HitResult.Type.ENTITY
