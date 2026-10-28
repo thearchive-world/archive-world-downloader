@@ -66,14 +66,6 @@ import world.thearchive.wdl.core.report.DownloadCounts;
 import world.thearchive.wdl.update.UpdateAvailable;
 import world.thearchive.wdl.update.UpdateCheck;
 
-/**
- * The download screen: start a new download with a typed name, or browse and resume/recover the wdl-managed downloads
- * already on disk. The vanilla world-select screen repurposed, built on vanilla widgets (no GUI library): an
- * {@link EditBox} name field, a primary Download/Resume button, a Done button, and an {@link ObjectSelectionList} of
- * rows fed the MC-free {@code core/browse} model. Loader-agnostic view code; the entry points (keybind, command,
- * pause-menu button) live per loader and route through {@link Wdl}, which decides per entry point whether the open runs
- * inline or is deferred to the next client tick.
- */
 public final class WdlDownloadsScreen extends Screen {
     private static final int NAME_MAX_LENGTH = 48;
     private static final int ICON_SIZE = 16;
@@ -86,18 +78,17 @@ public final class WdlDownloadsScreen extends Screen {
     private static final int BUTTON_GAP = 8;
     private static final int TOP_Y = 4;
     private static final int LIST_BOTTOM_MARGIN = 12;
-    private static final int HEADER_ROW_HEIGHT = 14; // the header / Open-Saves label row; text is centered within it
-    private static final int TOOLTIP_WRAP_WIDTH = 200; // wrap width for a multi-line row tooltip
+    private static final int HEADER_ROW_HEIGHT = 14;
+    private static final int TOOLTIP_WRAP_WIDTH = 200;
 
-    // Rows draw only icon + text; vanilla's AbstractSelectionList.renderItem paints the selection treatment.
     private static final int HEADER_ARGB = BrandColors.opaque(BrandColors.IVORY);
     private static final int NAME_ARGB = BrandColors.opaque(BrandColors.AMBER);
-    private static final int GRAY_ARGB = BrandColors.opaque(BrandColors.GRAY); // date, summary, size
+    private static final int GRAY_ARGB = BrandColors.opaque(BrandColors.GRAY);
     private static final int LINK_REST_ARGB = BrandColors.opaque(BrandColors.GRAY);
     private static final int LINK_HOVER_ARGB = BrandColors.opaque(BrandColors.AMBER_HOVER);
     private static final int RECOVER_ARGB = BrandColors.opaque(BrandColors.AMBER);
     private static final int TAINTED_ARGB = BrandColors.opaque(BrandColors.RUST);
-    private static final int PARTIAL_ARGB = BrandColors.opaque(BrandColors.AMBER); // a partial download's chip
+    private static final int PARTIAL_ARGB = BrandColors.opaque(BrandColors.AMBER);
     private static final int BANNER_FILL_ARGB = 0x99000000 | BrandColors.PANEL;
     private static final int BANNER_OUTLINE_ARGB = BrandColors.opaque(BrandColors.AMBER);
     private static final int BANNER_GLYPH_ARGB = BrandColors.opaque(BrandColors.AMBER);
@@ -112,7 +103,7 @@ public final class WdlDownloadsScreen extends Screen {
     private static final int BANNER_GAP = 8;
     private static final int BANNER_HEIGHT = 22;
     private static final String DOT = "·";
-    private static final String SUMMARY_ABSENT = "–"; // an en dash marking a not-applicable cell, not a minus
+    private static final String SUMMARY_ABSENT = "–";
     private static final String TRIANGLE_EXPANDED = "▼ ";
     private static final String TRIANGLE_COLLAPSED = "▶ ";
 
@@ -140,8 +131,8 @@ public final class WdlDownloadsScreen extends Screen {
     private final BooleanSupplier remoteWorld;
     private final @Nullable String activeDownloadName;
 
-    // The existing-worlds list state, remembered across re-opens for the JVM session: it starts collapsed and a
-    // manual toggle persists, except /wdl downloads forces it expanded (and that choice then persists too).
+    // The existing-worlds list state, remembered across re-opens for the JVM session: it starts collapsed and a manual
+    // toggle persists.
     private static boolean listCollapsed = true;
 
     private @Nullable EditBox nameField;
@@ -155,25 +146,15 @@ public final class WdlDownloadsScreen extends Screen {
 
     private @Nullable Runnable pendingTooltip;
 
-    // The capture state init() last built its widgets for; tick() rebuilds when the live state diverges, so a
-    // flip between idle and capturing swaps the whole widget set rather than leaving a stale control on screen.
     private CaptureState builtForState = CaptureState.IDLE;
 
-    // The on-disk size: a daemon walks each row's folder the first time the row is drawn (so only visible rows
-    // are walked, never the whole list at once) and the result fills in its size on the render thread. The dedupe
-    // set and the walked overlay are screen-scoped, so a resize-driven init() rebuild re-binds the fresh rows to
-    // sizes already walked instead of re-walking. removed() closes the scanner; a re-open recreates it.
     private OnDiskSizeScanner sizeScanner = new OnDiskSizeScanner();
     private final Map<Path, Long> walkedSizes = new HashMap<>();
     private final Set<Path> scheduledWalks = new HashSet<>();
 
-    // The restore-source availability cache feeding the tainted rows' restore chip, filled by the same
-    // scanner on its availability kind and invalidated wherever the entries list is re-pulled.
     private final Map<Path, Path> availableSources = new HashMap<>();
     private final Set<Path> scheduledProbes = new HashSet<>();
 
-    // The wall clock of the last sweep-work probe (never a gameplay-time counter, which pauses with the
-    // game); tick() re-probes at the sweep's own TTL cadence while the screen stays open.
     private long lastSweepCheckMillis;
 
     public WdlDownloadsScreen(@Nullable Screen parent, Path savesDirectory, @Nullable Path loadedWorld,
@@ -205,10 +186,8 @@ public final class WdlDownloadsScreen extends Screen {
         this.remoteWorld = remoteWorld;
         this.activeDownloadName = activeDownloadName;
         if (expandExistingList && !entries.isEmpty()) {
-            listCollapsed = false; // /wdl downloads forces the list open; the choice then persists for the session
+            listCollapsed = false;
         }
-        // The launch sweep rides the screen open: pending roll-back work under the temporary root is dispatched
-        // from idle here, and the TTL re-check in tick() repeats the probe while the screen stays open.
         this.lastSweepCheckMillis = Util.getMillis();
         if (captureState.get() == CaptureState.IDLE
                 && RestoreOperation.RestoreSweep.hasWork(savesDirectory)) {
@@ -218,8 +197,8 @@ public final class WdlDownloadsScreen extends Screen {
 
     @Override
     protected void init() {
-        // init() re-runs on resize and on a capture-state flip; release the prior rows' icon textures before the
-        // widget lists are cleared, then build the widget set for the live capture state.
+        // init() re-runs on resize and on a capture-state flip; release the prior rows' icon textures, then build the
+        // widget set for the live capture state.
         if (this.list != null) {
             this.list.closeIcons();
         }
@@ -234,7 +213,6 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** Idle: an editable name field, a Download/Resume button, and the browsable downloads list. */
     private void initIdle() {
         String name = this.selectedEntry != null ? this.selectedEntry.folderName() : this.retainedName;
 
@@ -273,8 +251,8 @@ public final class WdlDownloadsScreen extends Screen {
         if (!listCollapsed && !this.entries.isEmpty()) {
             addRenderableWidget(downloadList);
         }
-        // removed() closes the scanner when a screen is pushed on top, so a re-open recreates it and lets the
-        // visible rows re-submit; the walked overlay persists, so nothing already walked is re-walked.
+        // removed() closes the scanner when a screen is pushed on top, so a re-open recreates it and lets the visible
+        // rows re-submit.
         if (this.sizeScanner.isClosed()) {
             this.sizeScanner = new OnDiskSizeScanner();
             this.scheduledWalks.clear();
@@ -283,10 +261,6 @@ public final class WdlDownloadsScreen extends Screen {
         setInitialFocus(field);
     }
 
-    /**
-     * In-capture: a non-editable label and a Stop button replace the field, primary action, list, and links, so the
-     * screen doubles as the running download's control. The browse affordances are for idle downloads only.
-     */
     private void initCapturing(CaptureState state) {
         this.nameField = null;
         this.list = null;
@@ -301,7 +275,6 @@ public final class WdlDownloadsScreen extends Screen {
 
         int buttonRowY = label.getY() + label.getHeight() + 6;
         boolean recording = state == CaptureState.RECORDING;
-        // a finishing save shows a disabled Saving label, not an actionable Stop
         Button primary = addButtonRow(buttonRowY, recording ? stopLabel() : savingLabel(),
                 button -> stopCapture(), recording);
         addUpdateBanner(buttonRowY + BUTTON_HEIGHT + 8);
@@ -310,10 +283,6 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /**
-     * Restoring: a busy label (named for the player restore's folder, or the folder-less sweep line) and a Done button,
-     * so the browse affordances wait until the disk settles while Esc and Done still leave.
-     */
     private void initRestoring() {
         this.nameField = null;
         this.primaryButton = null;
@@ -356,18 +325,10 @@ public final class WdlDownloadsScreen extends Screen {
         return primary;
     }
 
-    /** The centered band the existing-worlds list and the update banner both span. */
     private int listBandWidth() {
         return Mth.clamp(this.width - 20, 280, 600);
     }
 
-    /**
-     * The newer-release banner: a bordered footer notice below the button row, sized to its content (capped at the list
-     * band) and centered, added when a result is held and not dismissed, re-evaluated on every open so a result that
-     * lands after the first open still surfaces; dismissal is remembered on the launch-scoped check, not this recreated
-     * screen. It deliberately ignores showChatMessages: silencing chat must not hide an affordance inside the mod's own
-     * UI. Returns the y where the content below the band resumes, {@code y} untouched when the banner is hidden.
-     */
     private int addUpdateBanner(int y) {
         UpdateCheck updateCheck = Wdl.updateCheck();
         if (!updateCheck.bannerVisible()) {
@@ -381,8 +342,6 @@ public final class WdlDownloadsScreen extends Screen {
         int curseforgeWidth = this.font.width("CurseForge");
         int dismissWidth = this.font.width(DISMISS_GLYPH);
         int leftWidth = this.font.width(WARNING_GLYPH) + this.font.width(prose);
-        // A row too wide for the list band drops the lower-priority CurseForge label rather than
-        // overflowing the box.
         boolean curseforgeFits = leftWidth + BANNER_GAP + modrinthWidth + BANNER_GAP + curseforgeWidth
                 + BANNER_GAP + dismissWidth <= maxBandWidth - 2 * BANNER_GAP;
         int innerWidth = leftWidth + BANNER_GAP + modrinthWidth + BANNER_GAP + dismissWidth
@@ -404,12 +363,6 @@ public final class WdlDownloadsScreen extends Screen {
         return y + BANNER_HEIGHT + 8;
     }
 
-    /**
-     * The passive "capture partially disabled" indicator at the start action: a centered amber caution line below the
-     * button row when a core capture kind is off, the cross-surface twin of the settings-screen row mark
-     * (defense-in-depth, not the sole guard). Returns the y where content below it resumes, {@code y} untouched when
-     * capture is whole.
-     */
     private int addCaptureWarning(int y) {
         if (!this.capturePartiallyDisabled) {
             return y;
@@ -420,14 +373,12 @@ public final class WdlDownloadsScreen extends Screen {
         return y + HEADER_ROW_HEIGHT + 6;
     }
 
-    /** Walk a row's folder the first time it is drawn, so only visible rows are walked, never the whole list. */
     private void scheduleSizeWalk(Path folder) {
         if (!this.walkedSizes.containsKey(folder) && this.scheduledWalks.add(folder)) {
             this.sizeScanner.submit(folder, false);
         }
     }
 
-    /** Probe a tainted row's restore source the first time it is drawn; the answer feeds the restore chip. */
     private void scheduleAvailabilityProbe(Path folder) {
         if (!this.availableSources.containsKey(folder) && this.scheduledProbes.add(folder)) {
             this.sizeScanner.submit(folder, true);
@@ -465,7 +416,6 @@ public final class WdlDownloadsScreen extends Screen {
             return;
         }
         this.retainedName = text;
-        // Editing the name is a fresh download: drop any selected row and relabel the primary action.
         this.selectedEntry = null;
         if (this.primaryButton != null) {
             this.primaryButton.setMessage(downloadLabel());
@@ -473,7 +423,6 @@ public final class WdlDownloadsScreen extends Screen {
         setPrimaryActive(TargetResolver.hasUsableName(text));
     }
 
-    /** Set the primary action's enabled state, explaining a disabled Download with the why tooltip. */
     private void setPrimaryActive(boolean active) {
         if (this.primaryButton == null) {
             return;
@@ -487,15 +436,15 @@ public final class WdlDownloadsScreen extends Screen {
         this.selectedEntry = entry;
         if (this.nameField != null) {
             suppressNameResponder = true;
-            this.nameField.setValue(entry.folderName()); // resume targets the folder verbatim
-            this.nameField.moveCursorToEnd(false); // a long prefilled name shows its end
+            this.nameField.setValue(entry.folderName());
+            this.nameField.moveCursorToEnd(false);
             suppressNameResponder = false;
             setFocused(this.nameField);
         }
         if (this.primaryButton != null) {
             this.primaryButton.setMessage(resumeLabel());
         }
-        setPrimaryActive(true); // a selected row resumes its folder verbatim, so the name gate does not apply
+        setPrimaryActive(true);
     }
 
     private void onPrimary() {
@@ -508,23 +457,17 @@ public final class WdlDownloadsScreen extends Screen {
         DownloadTarget target = TargetResolver.resolveNew(typed, LocalDate.now(), this.appendDateSuffix);
         switch (TargetResolver.classifyTarget(target.folderName(), this.savesDirectory, this.loadedWorld)) {
             case REFUSE_LOADED -> refuseLoadedWorld();
-            // Merging into an existing folder is a resume: a RESUME target takes the pre-merge backup and keeps
-            // the world's own level.dat name, where a NEW target would skip the pre-merge backup.
+            // Merging into an existing folder is a resume: a RESUME target keeps the world's own level.dat name, where
+            // a NEW target would skip the pre-merge backup.
             case RESUME_EXISTING -> resumeFolder(target.folderName(), true);
             case NEW -> start(target);
         }
     }
 
-    /** The one-click resume shortcut for a recoverable row: same confirm as the primary Resume. */
     private void recover(DownloadEntry entry) {
         resumeEntry(entry);
     }
 
-    /**
-     * The restore chip's click: re-run the source discovery fresh at the gate (the cached answer only decided to show
-     * the chip), refuse with the source-changed toast when the source vanished, else pin it into the restore confirm
-     * whose Restore dispatches the guarded replace and returns here to show the busy label.
-     */
     private void restoreEntry(DownloadEntry entry) {
         Optional<RestoreSource> source = RestoreSource.find(this.savesDirectory, entry.folderName());
         if (source.isEmpty()) {
@@ -553,10 +496,8 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     /**
-     * The screen's resume junction, the front-loaded guards mirroring the command flow's so a resume that will be
-     * refused never flashes a backup warning first: the remote-world test, then the managed stat with its per-cause
-     * split (a vanished folder is the missing cause; a file or an unmanaged directory at the name is a foreign occupant
-     * either way, named by its filesystem-reported spelling), then the tainted gate. The typed-name tail passes
+     * The screen's resume junction, the front-loaded guards so a resume that will be refused never flashes a backup
+     * warning first: the remote-world test, then the managed stat, then the tainted gate. The typed-name tail passes
      * {@code suggestRename} so an occupant refusal carries the name-choosing advice; the row and Recover paths pass
      * false, since a selected row involves no typed name to change.
      */
@@ -582,14 +523,9 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     /**
-     * The tainted decision (fresh disk read) as the outermost resume gate: a REFUSE stops with the refusal toast,
-     * unless a fresh source discovery finds a clean backup, in which case the refusal becomes the blocked-offer screen
-     * (a screen click is deliberate by construction) whose Restore dispatches the replace instead; a CONFIRM shows the
-     * tainted confirm whose Continue runs the map-id mismatch gate then a direct start (so the tainted confirm stands
-     * in for the merge confirm, one prompt not two), picking the restorable tip variant when the folder is tainted and
-     * a source exists (an unknown taint keeps the plain tainted copy); and an ALLOW runs the map-id mismatch gate then
-     * {@code allowDownstream}, the caller's normal resume tail. The hard refusal comes before any advisory warn, so a
-     * tainted-and-blocked folder never flashes the mismatch confirm.
+     * A CONFIRM shows the tainted confirm whose Continue runs the map-id mismatch gate then a direct start (so the
+     * tainted confirm stands in for the merge confirm, one prompt not two), picking the restorable tip variant when the
+     * folder is tainted and a source exists (an unknown taint keeps the plain tainted copy).
      */
     private void gateTaintedThenResume(String folderName, Runnable allowDownstream) {
         SinglePlayerTaint.TaintState taint = SinglePlayerTaint.classify(this.savesDirectory.resolve(folderName));
@@ -639,11 +575,8 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     /**
-     * When {@code mismatch} is set, show a one-time confirm whose Continue runs {@code proceed}; otherwise run
-     * {@code proceed} now. {@code backupHere} is whether this confirm is the terminal prompt that commits the resume,
-     * so it alone carries the backup reassurance while the earlier gates pass false, showing the line once. The
-     * reusable middle layer between the tainted gate and the resume tail: {@code proceed} is a direct start after the
-     * tainted confirm, or the caller's normal downstream (the merge confirm) on the allow path.
+     * {@code backupHere} is set only on the terminal prompt that commits the resume, so it alone carries the backup
+     * reassurance, showing the line once.
      */
     private void gateMapIdMismatch(String folderName, boolean mismatch, boolean backupHere, Runnable proceed) {
         if (!mismatch) {
@@ -667,28 +600,26 @@ public final class WdlDownloadsScreen extends Screen {
             return;
         }
         if (!this.confirmResume) {
-            start(target); // continue silently; the backup is separate, still governed by zipOnResume
+            start(target);
             return;
         }
         this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
                 folderName, FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), this.zipOnResume,
                 () -> start(target),
-                () -> this.minecraft.setScreen(this))); // cancel returns here, typed name preserved, no backup
+                () -> this.minecraft.setScreen(this)));
     }
 
     private void start(DownloadTarget target) {
         this.onStart.accept(target);
         if (this.minecraft != null) {
-            this.minecraft.setScreen(null); // back to the game; the capture runs
+            this.minecraft.setScreen(null);
         }
     }
 
-    /** Request that the running capture stop; tick() swaps to the saving widget set once the state flips. */
     private void stopCapture() {
         this.onStop.run();
     }
 
-    /** The "Existing Worlds (N)" disclosure: a focusable, narratable header whose whole row toggles the list. */
     private final class DisclosureWidget extends AbstractWidget {
         DisclosureWidget(int x, int y, int width) {
             super(x, y, width, HEADER_ROW_HEIGHT, Component.translatable("wdl.screen.downloads.existing",
@@ -716,7 +647,6 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** The "Open Saves Folder" link: a focusable, narratable control that opens the saves directory. */
     private final class OpenSavesWidget extends AbstractWidget {
         OpenSavesWidget(int x, int y, int width) {
             super(x, y, width, HEADER_ROW_HEIGHT, Component.translatable("wdl.screen.downloads.open_saves"));
@@ -741,14 +671,13 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** The banner's bordered band: an amber outline over a subtle panel, with the glyph and prose inside. */
     private final class BannerPanelWidget extends AbstractWidget {
         private final Component prose;
 
         BannerPanelWidget(int x, int y, int width, Component prose) {
             super(x, y, width, BANNER_HEIGHT, prose);
             this.prose = prose;
-            this.active = false; // decorative and inert, like a vanilla StringWidget
+            this.active = false;
         }
 
         @Override
@@ -766,7 +695,6 @@ public final class WdlDownloadsScreen extends Screen {
         protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {}
     }
 
-    /** One named banner link: an underlined teal label opening its release page in the OS browser. */
     private final class BannerLinkWidget extends AbstractWidget {
         private final Component label;
         private final String url;
@@ -796,7 +724,6 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** The banner's dismiss control: hides the banner for the rest of the launch. */
     private final class BannerDismissWidget extends AbstractWidget {
         BannerDismissWidget(int x, int y, int width) {
             super(x, y, width, BANNER_HEIGHT,
@@ -807,8 +734,8 @@ public final class WdlDownloadsScreen extends Screen {
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
-            // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
-            // centering formula reads a pixel high without the nudge.
+            // The glyph's ink sits high in its line box, so the shared centering formula reads a pixel high without the
+            // nudge.
             surface.text(font, DISMISS_GLYPH, getX(),
                     getY() + (getHeight() - font.lineHeight) / 2 + 1, color);
         }
@@ -825,14 +752,13 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** The passive capture-disabled caution: an inert amber glyph and label with an explanatory tooltip. */
     private final class CaptureWarningWidget extends AbstractWidget {
         private final Component text;
 
         CaptureWarningWidget(int x, int y, int width, Component text) {
             super(x, y, width, HEADER_ROW_HEIGHT, text);
             this.text = text;
-            this.active = false; // a passive indicator, like the update banner's panel, not a control
+            this.active = false;
             setTooltip(Tooltip.create(Component.translatable("wdl.screen.downloads.capture_disabled.tooltip")));
         }
 
@@ -882,10 +808,6 @@ public final class WdlDownloadsScreen extends Screen {
     public void tick() {
         CaptureState state = this.captureState.get();
         if (state != this.builtForState) {
-            // The flip back to idle is the moment disk state changed (a save finished, or a restore or sweep
-            // ended), so the browse model and the caches are refreshed here, not on resize-driven init()
-            // reruns; a completed sweep that never touched the disk skips the re-pull. The availability
-            // cache rides the entries list, so it invalidates on the same re-pull.
             if (state == CaptureState.IDLE
                     && (this.builtForState != CaptureState.RESTORING || Wdl.lastRestoreChangedDisk())) {
                 this.entries = this.entriesSupplier.get();
@@ -894,7 +816,7 @@ public final class WdlDownloadsScreen extends Screen {
                 this.availableSources.clear();
                 this.scheduledProbes.clear();
             }
-            rebuildWidgets(); // the capture state flipped while open (started, stopped, or finished saving)
+            rebuildWidgets();
             return;
         }
         if (state == CaptureState.IDLE
@@ -904,10 +826,6 @@ public final class WdlDownloadsScreen extends Screen {
                 Wdl.launchSweep(this.savesDirectory);
             }
         }
-        // Apply finished walks on the render thread: a real on-disk total becomes the row's size; a failed walk
-        // is dropped, so the row keeps showing no size rather than a wrong one. A zero total is dropped the same
-        // way, harmless because a wdl-managed folder always has level.dat and a wdl/ record, so it is never zero.
-        // An availability answer fills the restore-source cache; a probe that found nothing stays out of it.
         for (OnDiskSizeScanner.Result result : this.sizeScanner.drainCompleted()) {
             Path source = result.restoreSource();
             if (source != null) {
@@ -923,16 +841,9 @@ public final class WdlDownloadsScreen extends Screen {
         if (this.list != null) {
             this.list.closeIcons();
         }
-        this.sizeScanner.close(); // drop queued walks and discard any in-flight result for this closed screen
+        this.sizeScanner.close();
     }
 
-    /**
-     * The named row's restore-chip hit box as last rendered, or null while the row is absent or its chip has never been
-     * drawn (source not cached, the row is the loaded world, or the list has not been expanded this open). Collapsing
-     * the list only removes its widget, so a row rendered once keeps its last-rendered rectangle rather than reverting
-     * to null; read the box only while the list is expanded. Exists for the test harness, so the screen gametests read
-     * the live rectangle instead of recomputing pixel math.
-     */
     public @Nullable ScreenRectangle restoreChipBox(String folderName) {
         DownloadList downloadList = this.list;
         if (downloadList == null) {
@@ -946,7 +857,6 @@ public final class WdlDownloadsScreen extends Screen {
         return null;
     }
 
-    /** The name field; Enter submits the primary action (download or resume) only while the button is enabled. */
     private final class NameField extends EditBox {
         NameField(Font font, int x, int y, int width, int height, Component message) {
             super(font, x, y, width, height, message);
@@ -964,7 +874,6 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** The row list: a vanilla selection list whose selection prefills the name field. */
     private final class DownloadList extends ObjectSelectionList<DownloadList.Row> {
         private boolean suppressPrefill;
 
@@ -985,7 +894,6 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            // An arrow / Recover click highlights the row like a body click, but does not prefill the field.
             Row row = getEntryAtPosition(mouseX, mouseY);
             if (row != null && row.handleEdgeClick((int) mouseX, (int) mouseY)) {
                 this.suppressPrefill = true;
@@ -999,7 +907,7 @@ public final class WdlDownloadsScreen extends Screen {
         @Override
         public void setSelected(@Nullable Row entry) {
             super.setSelected(entry);
-            if (entry != null && !this.suppressPrefill) { // a body click prefills; an edge click only highlights
+            if (entry != null && !this.suppressPrefill) {
                 onRowSelected(entry.entry);
             }
         }
@@ -1010,7 +918,6 @@ public final class WdlDownloadsScreen extends Screen {
             }
         }
 
-        /** One download row: icon, name, last-played date, and either the summary plus size or a Recover chip. */
         final class Row extends ObjectSelectionList.Entry<Row> {
             private final DownloadEntry entry;
             private final String displayName;
@@ -1050,7 +957,7 @@ public final class WdlDownloadsScreen extends Screen {
                     texture.upload(NativeImage.read(bytes));
                     return texture;
                 } catch (IOException | RuntimeException e) {
-                    return null; // a validated-but-undecodable icon is dropped, not fatal
+                    return null;
                 }
             }
 
@@ -1078,8 +985,6 @@ public final class WdlDownloadsScreen extends Screen {
             private void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
                     float partialTick) {
                 RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
-                // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
-                // for its restore chip and never walked, a complete row is walked for its size.
                 if (this.entry.isTainted()) {
                     scheduleAvailabilityProbe(this.folder);
                 } else if (this.entry.health() == DownloadHealth.COMPLETE) {
@@ -1107,7 +1012,7 @@ public final class WdlDownloadsScreen extends Screen {
             private void renderSummary(RenderSurface surface, int textX, int y, int rightLimit) {
                 DownloadCounts counts = this.entry.counts();
                 if (counts == null) {
-                    return; // a recoverable download has no trustworthy summary
+                    return;
                 }
                 int pairX = textX;
                 boolean any = false;
@@ -1131,10 +1036,6 @@ public final class WdlDownloadsScreen extends Screen {
                         true, rightLimit);
             }
 
-            /**
-             * One summary cell clamped at {@code rightLimit} (the slot's left edge): a piece that crosses the limit is
-             * ellipsized and freezes the cursor there, so the cells that follow draw nothing.
-             */
             private int cell(RenderSurface surface, int pairX, int y, String labelKey, int value,
                     boolean separator, int rightLimit) {
                 return cell(surface, pairX, y, labelKey, Integer.toString(value), separator, rightLimit);
@@ -1170,10 +1071,6 @@ public final class WdlDownloadsScreen extends Screen {
                 return valueX + font.width(text);
             }
 
-            /**
-             * Draw the arrow and the slot content, returning the slot content's left edge (the arrow's when the slot is
-             * empty) so the summary can clamp against it.
-             */
             private int renderStatus(RenderSurface surface, int rightEdge, int y, int mouseX, int mouseY,
                     boolean hovering) {
                 this.arrowLeft = rightEdge - font.width(ARROW);
@@ -1185,10 +1082,6 @@ public final class WdlDownloadsScreen extends Screen {
                 boolean overArrow = hovering && inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, y);
                 surface.text(font, ARROW, this.arrowLeft, y, overArrow ? LINK_HOVER_ARGB : LINK_REST_ARGB);
 
-                // The slot just left of the arrow holds the Singleplayer chip (joined by the Restore action
-                // chip when a clean source is cached and the row is not the loaded world), the Recover chip,
-                // the Partial chip, or the on-disk size. A chip stands in for the size, so a chip row shows
-                // no size and, in renderContent, never walks its folder. A plain row shows its size once it lands.
                 int slotRight = this.arrowLeft - 4;
                 int slotLeft = this.arrowLeft;
                 if (this.entry.isTainted()) {
@@ -1213,8 +1106,6 @@ public final class WdlDownloadsScreen extends Screen {
                     int chipLeft = slotRight - font.width(chip);
                     surface.text(font, chip, chipLeft, y, TAINTED_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
-                        // With the Restore chip present the tooltip drops the fresh-download advice: the
-                        // chip beside it is the better way out.
                         Component taintedTip = Component.translatable(restorable
                                 ? "wdl.screen.downloads.tooltip.tainted_restorable"
                                 : "wdl.screen.downloads.tooltip.tainted");
@@ -1257,10 +1148,6 @@ public final class WdlDownloadsScreen extends Screen {
                 return slotLeft;
             }
 
-            /**
-             * The restore glyph comes from the fallback font, whose ink sits high in its line box, so the glyph alone
-             * is drawn a pixel lower while the label stays on the row baseline.
-             */
             private void drawRestoreChip(RenderSurface surface, String chip, int x, int y, int color) {
                 if (chip.startsWith(RESTORE_GLYPH)) {
                     surface.text(font, RESTORE_GLYPH, x, y + 1, color);
@@ -1271,21 +1158,18 @@ public final class WdlDownloadsScreen extends Screen {
                 }
             }
 
-            /** The restore chip's tooltip: the action, the source zip, and the snapshot fate by zipOnResume. */
             private Component restoreTooltip(Path source) {
                 String sourceName = source.getFileName().toString();
                 if (!zipOnResume) {
                     return Component.translatable("wdl.screen.downloads.tooltip.restore_no_backup", sourceName);
                 }
                 if (this.snapshotName == null) {
-                    // A directory probe, and a row is rebuilt whenever a restore could have taken the next free name.
                     this.snapshotName = RestoreOperation.nextSnapshotName(savesDirectory, this.entry.folderName());
                 }
                 return Component.translatable("wdl.screen.downloads.tooltip.restore", sourceName,
                         this.snapshotName);
             }
 
-            /** The on-disk total once its walk lands; absent until then. */
             private OptionalLong effectiveSize() {
                 Long walked = walkedSizes.get(this.folder);
                 return walked != null ? OptionalLong.of(walked) : OptionalLong.empty();
@@ -1297,7 +1181,7 @@ public final class WdlDownloadsScreen extends Screen {
 
             boolean handleEdgeClick(int mouseX, int mouseY) {
                 if (inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, this.line2Top)) {
-                    Util.getPlatform().openPath(this.folder); // the per-row open-folder affordance
+                    Util.getPlatform().openPath(this.folder);
                     return true;
                 }
                 if (this.entry.health() == DownloadHealth.RECOVERABLE && this.recoverLeft >= 0
@@ -1313,11 +1197,6 @@ public final class WdlDownloadsScreen extends Screen {
                 return false;
             }
 
-            /**
-             * The restore chip's live hit box, or null while the chip is absent. The live hit test treats both edges as
-             * inclusive, so the width and height carry the extra pixel: every point inside the reported rectangle
-             * clicks the chip.
-             */
             @Nullable
             ScreenRectangle restoreChipBox() {
                 if (this.restoreLeft < 0) {

@@ -24,12 +24,6 @@ import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The 1.21.11 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
- * Noon and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master
- * gates the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
- * against the real {@code GameRules}.
- */
 class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
@@ -100,10 +94,10 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aDefaultWorldIsStableWhileVoidStaysExperimental() {
-        // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens
-        // without the experimental-world warning; the void world's flat nether/end are inherently experimental.
-        // The lifecycle is re-derived from the baked generators at load, never read from level.dat, so no
-        // level.dat write can suppress the void world's warning.
+        // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens without
+        // the experimental-world warning; the void world's flat nether/end are inherently experimental. The lifecycle
+        // is re-derived from the generators at load and never stored in level.dat, so no level.dat flag can suppress
+        // the void world's warning.
         assertEquals(Lifecycle.stable(), lifecycle(build(with("worldType", "DEFAULT"))));
         assertEquals(Lifecycle.experimental(), lifecycle(build(WorldOutputConfig.DEFAULTS)));
     }
@@ -200,7 +194,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() {
-        // spawn_mobs is the 1.21.5+ snake_case id; the 1.21.4 rule is doMobSpawning.
+        // spawn_mobs is the 1.21.11+ snake_case id; before that the rule is doMobSpawning.
         LevelDataWriter.LevelData built = build(with("gamerule.spawn_mobs", "true"));
 
         assertTrue(built.gameRules().unknownIds().contains("spawn_mobs"), "the cross-band loss is surfaced");
@@ -209,7 +203,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aValidOverrideIsWritten() {
-        // doImmediateRespawn is not in the curated set; a valid override of it passes through.
+        // doImmediateRespawn is not in the curated set.
         GameRules rules = gameRules(build(with("gamerule.doImmediateRespawn", "true")));
 
         assertTrue(rules.getBoolean(GameRules.RULE_DO_IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");

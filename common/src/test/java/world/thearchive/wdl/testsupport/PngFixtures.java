@@ -3,11 +3,6 @@
 
 package world.thearchive.wdl.testsupport;
 
-/**
- * A minimal-PNG fixture for the browse tests: the 8-byte signature followed by an IHDR chunk carrying a given width and
- * height, the smallest byte sequence WorldIcon.validate accepts. Shared so the icon-validation and catalog tests build
- * the same bytes rather than each carrying a near-copy.
- */
 public final class PngFixtures {
     private static final byte[] PNG_SIGNATURE = { (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
 

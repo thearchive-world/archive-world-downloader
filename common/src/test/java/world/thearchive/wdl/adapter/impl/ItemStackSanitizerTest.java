@@ -24,12 +24,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.BadStacks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The unit-level guard for {@link ItemStackSanitizer} itself, exercising the repair policy directly rather than through
- * an entity or a merchant offer. This band's {@code ItemEnchantments} {@code LEVEL_CODEC} is {@code intRange(0, 255)},
- * so a level-0 enchantment encodes fine here and cannot stand in for a genuinely unsavable component the way it does on
- * later bands; {@code ItemStackSanitizer.repairEnchantments} has no fixture reachable on this band as a result.
- */
 class ItemStackSanitizerTest {
     @BeforeAll
     static void bootstrapVanilla() {
@@ -83,8 +77,6 @@ class ItemStackSanitizerTest {
 
     @Test
     void aBowWithFailingComponentIsDroppedAndBecomesSavable() {
-        // On this band ItemEnchantments.LEVEL_CODEC is intRange(0,255), so a level-0 enchant saves fine and cannot
-        // stand in for a genuinely unsavable component; DAMAGE = -1 is what NON_NEGATIVE_INT actually rejects here.
         ItemStack bow = new ItemStack(Items.BOW);
         bow.set(DataComponents.DAMAGE, -1);
         assertFalse(savable(bow), "precondition: the crafted bow is genuinely unsavable");

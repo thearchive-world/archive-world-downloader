@@ -29,10 +29,8 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the equipment loss an item component the disk codec rejects causes on the player capture. On
- * this band the save throws on such a stack rather than absorbing it, so the capture loses the whole player rather than
- * one entry. {@link PlayerSinkImpl} repairs the stack before the save, so these tests read the captured NBT back rather
- * than checking that a tag came out, and they cover the restore left behind by a failure partway through the swap pass.
+ * {@link PlayerSinkImpl} repairs the stack before the save, so these tests read the captured NBT back rather than
+ * checking that a tag came out.
  */
 class PlayerSinkItemDegradationTest {
     /** This band writes worn items into the Inventory list: armor at 100 plus its index, the offhand at 150. */
@@ -152,7 +150,6 @@ class PlayerSinkItemDegradationTest {
                 "and the restored stack is the unrepaired original");
     }
 
-    /** A headless Player double carrying caller-set equipment, able to fail one slot read on demand. */
     private static final class HeadlessPlayer extends Player {
         private boolean failReadingSaddle;
 

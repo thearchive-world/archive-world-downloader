@@ -15,12 +15,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.EntityFixtures;
 
-/**
- * The node index every per-node question about a mount record is asked through. The index must reach a node at any
- * depth, hand back the node that lives inside the tree rather than a copy of it (a caller writes contents onto it), and
- * decode identity through the {@code "UUID"} codec rather than by tag equality, since a tag we did not produce can hold
- * an unreadable one and must not become a key.
- */
 class EntityTreeWalkTest {
     private static final UUID CARRIER = UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402");
     private static final UUID MOUNT = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");

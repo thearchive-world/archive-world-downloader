@@ -9,11 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import net.minecraft.world.phys.AABB;
 import org.junit.jupiter.api.Test;
 
-/**
- * The entity rim geometry: a chested animal's rim box is lowered from its full standing box to the chest, and a
- * tradeable villager's below its head, each growing from the feet so the footprint and ground line are untouched while
- * only the top drops.
- */
 class OutlineTrackerTest {
     @Test
     void chestedRimBoxCapsTopToChestHeightKeepingFootprint() {

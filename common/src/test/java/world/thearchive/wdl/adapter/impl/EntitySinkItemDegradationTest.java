@@ -31,18 +31,9 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the item and equipment degradation this band exhibits. Unlike the unresolved-leash case
- * ({@link EntitySinkLeashDegradationTest}), a disk-codec-invalid item component throws the entity save out entirely on
- * this band: {@link ItemStack#save} ends in {@code getOrThrow()}, and {@code Mob.addAdditionalSaveData} and
- * {@code ItemEntity.addAdditionalSaveData} call it directly per stack with no codec-level recovery, so a mob equipped
- * with a bad bow, or an item entity carrying a bad stack, would otherwise abort {@code encodeChunk} with an exception
- * rather than save with the item quietly gone. Both fixtures below use a raw {@code set()} of
- * {@link DataComponents#DAMAGE} to -1, a {@code NON_NEGATIVE_INT} field that {@code set()} does no validation against;
- * this band's {@code ItemEnchantments} {@code LEVEL_CODEC} is {@code intRange(0, 255)}, so a level-0 enchantment saves
- * fine here and cannot stand in as the unsavable fixture the way it does on later bands. {@link EntitySinkImpl} repairs
- * the stack up front instead of relying on that throw, so these tests assert on the saved NBT itself, not just that the
- * entity survived: a regression that let the bad stack reach save unrepaired would make {@code encodeChunk} throw, not
- * merely return NBT with the item missing.
+ * Both fixtures below use a raw {@code set()} of {@link DataComponents#DAMAGE} to -1, a {@code NON_NEGATIVE_INT} field
+ * that {@code set()} does no validation against. {@link EntitySinkImpl} repairs the stack up front, so these tests
+ * assert on the saved NBT itself, not just that the entity survived.
  */
 class EntitySinkItemDegradationTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -65,10 +56,7 @@ class EntitySinkItemDegradationTest {
         CompoundTag chunk = sink.encodeChunk(List.of(mob), new ChunkPos(0, 0), registries, false);
 
         assertNotNull(chunk, "the mob is saved");
-        // Assert on the SAVED NBT, not just non-null: without the fix entity.save throws out of the codec's
-        // getOrThrow for the bad component, so encodeChunk would error rather than return a tag at all. Neither
-        // TagValueInput nor EntityEquipment exists on this band; Mob writes equipment as the ArmorItems/HandItems
-        // ListTags, mainhand at HandItems index 0, each entry itemStack.save(registryAccess()).
+        // Mob writes equipment as the ArmorItems/HandItems ListTags, mainhand at HandItems index 0.
         CompoundTag entityTag = chunk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
         CompoundTag savedTag = entityTag.getList("HandItems", Tag.TAG_COMPOUND).getCompound(0);
         ItemStack savedBow = ItemStack.parse(registries, savedTag).orElse(ItemStack.EMPTY);
@@ -118,7 +106,6 @@ class EntitySinkItemDegradationTest {
         }
     }
 
-    /** A headless ItemEntity double carrying a caller-set stack. */
     private static final class DropItem extends ItemEntity {
         private DropItem() {
             super(EntityType.ITEM, HeadlessLevel.get());

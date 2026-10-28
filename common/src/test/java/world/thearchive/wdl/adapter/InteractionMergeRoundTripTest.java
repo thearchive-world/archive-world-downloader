@@ -30,15 +30,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the two new band-stable merge writes that interaction-prediction capture adds beside the
- * open-time container/lectern path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack.CODEC}) and beehive
- * occupants under {@code "bees"} (via {@code Occupant.LIST_CODEC}). Each is the capture-then-merge round-trip proven
- * against vanilla's own read-back (the exact form the block entity's {@code loadAdditional} uses): the captured content
- * survives serialization, lands on the matching captured block entity under its one key with no other field clobbered,
- * decodes back to the same content, and only the flushed chunk's stash entries drain. Server-free: real
- * {@link ItemStack}s/occupants and hand-built chunk tags, no live client and no {@code Level}.
- */
 class InteractionMergeRoundTripTest {
     private static RegistryAccess registries;
 
@@ -47,13 +38,11 @@ class InteractionMergeRoundTripTest {
         registries = TestRegistries.frozen();
     }
 
-    // A renamed block entity, so a real vanilla sibling field stands in for the ones the merge must not clobber.
     private static CompoundTag taggedBlockEntity(String id, int x, int y, int z) {
         return namedBlockEntity(id, x, y, z, "keep-me");
     }
 
     private static ItemStack readRecordItem(CompoundTag jukeboxBlockEntityTag) {
-        // vanilla JukeboxBlockEntity.loadAdditional
         Optional<ItemStack> back = ItemStack.CODEC
                 .parse(registries.createSerializationContext(NbtOps.INSTANCE), jukeboxBlockEntityTag.get("RecordItem"))
                 .result();
@@ -62,7 +51,7 @@ class InteractionMergeRoundTripTest {
     }
 
     private static List<BeehiveBlockEntity.Occupant> readBees(CompoundTag beehiveBlockEntityTag) {
-        // Vanilla BeehiveBlockEntity.loadAdditional's exact read
+        // Vanilla BeehiveBlockEntity.loadAdditional's read
         return BeehiveBlockEntity.Occupant.LIST_CODEC
                 .parse(registries.createSerializationContext(NbtOps.INSTANCE), beehiveBlockEntityTag.get("bees"))
                 .result().orElse(List.of());
@@ -73,11 +62,11 @@ class InteractionMergeRoundTripTest {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
         CompoundTag chunkTag = chunkTagWith(
                 taggedBlockEntity("minecraft:jukebox", 10, 70, 20),
-                taggedBlockEntity("minecraft:furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
+                taggedBlockEntity("minecraft:furnace", 11, 70, 20));
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT), registries));
-        BlockPos elsewhere = new BlockPos(100, 70, 200); // a jukebox in a different chunk, not being flushed
+        BlockPos elsewhere = new BlockPos(100, 70, 200);
         stash.put(elsewhere, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_13), registries));
 
         int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
@@ -105,9 +94,6 @@ class InteractionMergeRoundTripTest {
 
         ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
 
-        // Vanilla JukeboxBlockEntity.loadAdditional starts the song player (the note particles) only when
-        // ticks_since_song_started is present, so the captured holder carries it (the disc just started at the
-        // click, hence tick 0). The disc sound itself cannot resume on load, an MC limitation.
         CompoundTag jukeboxBlockEntity = findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 10, 70, 20);
         assertEquals(0L,
                 (jukeboxBlockEntity.contains("ticks_since_song_started")
@@ -121,7 +107,7 @@ class InteractionMergeRoundTripTest {
         BlockPos hivePos = new BlockPos(-3, 64, 7);
         CompoundTag chunkTag = chunkTagWith(
                 taggedBlockEntity("minecraft:beehive", -3, 64, 7),
-                taggedBlockEntity("minecraft:chest", -2, 64, 7)); // a neighbor BE that must stay untouched
+                taggedBlockEntity("minecraft:chest", -2, 64, 7));
 
         List<BeehiveBlockEntity.Occupant> occupants = List.of(BeehiveBlockEntity.Occupant.create(120),
                 BeehiveBlockEntity.Occupant.create(45));
@@ -146,7 +132,6 @@ class InteractionMergeRoundTripTest {
     @Test
     void mergeDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        // A jukebox, but in a different cell than the stashed pos
         CompoundTag chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 2, 64, 1));
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();

@@ -32,25 +32,14 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.EntitySink;
 
-/**
- * 1.21.1 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
- *
- * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
- * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the entities-region envelope from
- * already-serialized tags (pure, so the headless round-trip guards it), plus
- * {@link #captureRootVehicle(Entity, RegistryAccess, boolean)}, a single-live gate-bypassing vehicle serialize.
- */
 public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, RegistryAccess registries,
             boolean forceMobPersistence) {
-        // Lift of EntityStorage.storeEntities' write branch, server-free: entity.save writes the entity NBT
-        // straight into a CompoundTag with no ServerLevel touch.
         List<CompoundTag> entityTags = new ArrayList<>();
         for (Entity entity : entities) {
             if (!entity.shouldBeSaved()) {
-                continue; // drops passengers (they also nest under their vehicle's Passengers list, so the flat
-                         // list would otherwise write them twice), removed entities, and player-only vehicles
+                continue; // drops one-player vehicles
             }
             CompoundTag entityTag = new CompoundTag();
             if (saveDroppingUnsavableLeashes(entity, entityTag)) {
@@ -65,12 +54,10 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag captureRootVehicle(Entity vehicle, RegistryAccess registries,
             boolean forceMobPersistence) {
-        // Vanilla saveParentVehicle serializes the root vehicle via root.save, id-bearing and passenger-recursing,
-        // bypassing shouldBeSaved (a one-player vehicle fails it). A ridden mount that finishes then gets dismounted
-        // in the downloaded world despawns exactly like any other captured mob, so it gets the same server-side
-        // PersistenceRequired restoration the standalone entity path applies via applyMobPersistence (a named mob,
-        // a loot-equipped mob, and every mob under forceMobPersistence). A codec reject throws out of save (leash
-        // gotcha class); the caller isolates it.
+        // Vanilla serializes the root vehicle via root.save, bypassing shouldBeSaved (a one-player vehicle fails it). A
+        // ridden mount that finishes then gets dismounted in the downloaded world can despawn like any other captured
+        // mob, so it gets the same server-side PersistenceRequired restoration the standalone entity path applies via
+        // applyMobPersistence (a named mob, a loot-equipped mob, and every mob under forceMobPersistence).
         CompoundTag tag = new CompoundTag();
         if (!saveDroppingUnsavableLeashes(vehicle, tag)) {
             return null;
@@ -81,16 +68,9 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Save the entity, first detaching any leash the client cannot save, swapping in a sanitized copy of any equipment
-     * or carried-item stack the client cannot save, and ordering a pet to sit from its synced pose, each on the entity
-     * and its passengers. A leash with neither a resolved holder nor a delayed attachment is what vanilla's
-     * {@link Leashable.LeashData} codec requireNonNulls on, so {@link Entity#save} throws on it; and because save
-     * recurses into passengers, a passenger's unsavable leash aborts the whole vehicle group, dropping a chested mob's
-     * container with it. Detaching just those unsavable leash links loses only the leash, mirroring the reconstruct
-     * path which leaves an unresolved leash link unset. An item component the disk codec rejects costs either the
-     * entity or the whole field being written, so {@link #sanitizeStacks} repairs the stack up front rather than
-     * recovering from either outcome. Capture runs on the client main thread, so every swap is unobservable, and each
-     * detached leash, swapped stack, and sit order is restored before returning so the live entities are unchanged.
+     * An item component the disk codec rejects costs the entity, so {@link #sanitizeStacks} repairs the stack up front.
+     * Each detached leash, swapped stack, and sit order is restored before returning so the live entities are
+     * unchanged.
      */
     private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
         List<DetachedLeash> detached = detachIfUnsavable(entity, null);
@@ -137,13 +117,8 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Swap each of the entity's live stacks the disk codec would reject (equipment on a {@link LivingEntity}, the
-     * carried item on an {@link ItemEntity}) for a sanitized copy, returning restores that put the originals back. Only
-     * a stack that fails the encode is swapped, so a clean entity is never mutated.
-     *
-     * <p>Keep {@code ops} lazy: {@code entity.registryAccess()} reaches through the entity's level, so hoisting the
-     * build into the wrapper would charge every captured entity for it and would demand a level of entities this method
-     * otherwise never touches.
+     * Keep {@code ops} lazy: {@code entity.registryAccess()} reaches through the entity's level, so hoisting the build
+     * into the wrapper would demand a level of entities this method otherwise never touches.
      */
     private static @Nullable List<Runnable> sanitizeStacks(Entity entity, @Nullable List<Runnable> restores) {
         if (entity instanceof LivingEntity living) {
@@ -186,8 +161,6 @@ public final class EntitySinkImpl implements EntitySink {
             @Nullable List<DetachedLeash> detached) {
         if (entity instanceof Leashable leashable) {
             Leashable.LeashData leashData = leashable.getLeashData();
-            // Vanilla's LeashData codec requireNonNulls a leash with neither a resolved holder nor a delayed
-            // attachment, so save() throws on exactly that state; a resolvable leash still saves normally
             if (leashData != null && leashData.leashHolder == null && leashData.delayedLeashInfo == null) {
                 List<DetachedLeash> list = detached != null ? detached : new ArrayList<>();
                 list.add(new DetachedLeash(leashable, leashData));
@@ -201,17 +174,12 @@ public final class EntitySinkImpl implements EntitySink {
     private record DetachedLeash(Leashable leashable, Leashable.LeashData leashData) {}
 
     /**
-     * Write the saddle a horse-family mount is wearing, which vanilla's own writer cannot see. Below the 1.21.5
-     * equipment-slot cut the saddle is a real stack in the mount's inventory slot 0, and the server never sends that
-     * container to the client, so vanilla finds slot 0 empty and emits no {@code SaddleItem}: a saddled mount archives
-     * unsaddled. What does arrive is the saddled bit of the synced entity-data flags, for every saddled mount and with
-     * no interaction, so the capture writes a plain saddle from it and vanilla's load path takes it from there, keeping
-     * the stack only if it is a saddle and re-deriving the flag itself.
+     * Below the 1.21.5 equipment-slot cut the saddle is a real stack in the mount's inventory slot 0, and the client
+     * never fills that slot, so vanilla finds slot 0 empty and emits no {@code SaddleItem}: a saddled mount archives
+     * unsaddled.
      *
-     * <p>Re-derived from synced state on every capture, so a partial re-flush cannot drop it and {@code EntityMerge}
-     * needs no carry-forward key for it. A renamed or component-bearing saddle saves as a plain one, the accepted
-     * residual: outside an open mount menu the client holds no source for a saddle's components. An existing key is
-     * left alone rather than overwritten, so a stack that did reach slot 0 keeps whatever it carries.
+     * <p>An existing key is left alone rather than overwritten, so a stack that did reach slot 0 keeps whatever it
+     * carries.
      */
     static void applySaddleItem(CompoundTag entityTag, boolean saddled, RegistryAccess registries) {
         if (saddled && !entityTag.contains("SaddleItem", Tag.TAG_COMPOUND)) {
@@ -220,13 +188,8 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Stamp every saddled horse-family mount in a saved entity group, matched by UUID rather than by position.
-     *
-     * <p>The nested half is the reason this is not a one-liner on the root tag. The entity save has already recursed
-     * into {@code "Passengers"} by the time it returns, so a mount that is itself a passenger reaches disk only as a
-     * nested compound, and a mount picked up by a plain minecart is exactly that. Position cannot be trusted to find
-     * it, because vanilla drops any passenger whose own save is refused and the surviving list is then shorter than the
-     * live one, so the walk keys on the {@code "UUID"} every entity tag carries.
+     * The entity save has already recursed into {@code "Passengers"} by the time it returns, so a mount that is itself
+     * a passenger reaches disk only as a nested compound, and a mount picked up by a plain minecart is exactly that.
      */
     static void applySaddleItem(CompoundTag entityTag, Entity entity, RegistryAccess registries) {
         Set<UUID> saddled = collectSaddled(entity, null);
@@ -260,19 +223,16 @@ public final class EntitySinkImpl implements EntitySink {
         }
     }
 
-    /** The band's own entity-tag UUID read, the same one {@code EntityMerge} uses. */
     private static @Nullable UUID readUuid(CompoundTag tag) {
         return UUIDUtil.CODEC.parse(NbtOps.INSTANCE, tag.get("UUID")).result().orElse(null);
     }
 
     /**
      * Restore the server-authoritative {@code PersistenceRequired} the client never receives. Two vanilla mechanisms
-     * set it that the capture can reconstruct: the NameTagItem sets it on any {@link Mob} it renames, and
+     * set it that the capture can reconstruct: the {@code NameTagItem} sets it on any {@link Mob} it renames, and
      * {@code Mob.setItemSlotAndDropWhenKilled} sets it when a mob equips a picked-up item. A named mob and a mob whose
      * equipment proves such a pickup (an item impossible for its natural spawn,
-     * {@link NaturalEquipment#wasLootEquipped}) are both stamped unconditionally, since either is a lossless
-     * correctness restoration. With {@code forceMobPersistence} on, every captured {@link Mob} is stamped too. A
-     * non-Mob entity is never touched.
+     * {@link NaturalEquipment#wasLootEquipped}) are both stamped unconditionally.
      */
     static void applyMobPersistence(CompoundTag entityTag, boolean isMob, boolean namedMob,
             boolean derivedPickup, boolean forceMobPersistence) {
@@ -281,11 +241,6 @@ public final class EntitySinkImpl implements EntitySink {
         }
     }
 
-    /**
-     * Derive the persistence flags from a live {@code entity} (Mob-ness, custom name, loot-equipped state) and apply
-     * them, so the standalone entity path and the ridden-mount path stamp persistence identically without duplicating
-     * the derivation.
-     */
     static void applyMobPersistence(CompoundTag entityTag, Entity entity, boolean forceMobPersistence) {
         boolean isMob = entity instanceof Mob;
         boolean namedMob = false;
@@ -300,7 +255,7 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
         if (entityTags.isEmpty()) {
-            return null; // skip empty entity-chunks: capture omits them (vanilla writes IOWorker.STORE_EMPTY)
+            return null;
         }
         ListTag entities = new ListTag();
         for (CompoundTag entityTag : entityTags) {

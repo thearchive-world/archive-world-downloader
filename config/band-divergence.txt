@@ -26,14 +26,14 @@
 # pre-1.21.2 forms.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric API 0.114.0 for 1.21.1 draws the HUD overlay through HudRenderCallback, unconditionally after the
-# whole vanilla HUD; fabric-api 0.119.4 for 1.21.4 moves to HudLayerRegistrationCallback with an
-# IdentifiedLayer, and 0.141.4 for 1.21.11 to HudElementRegistry.addLast on an Identifier.
+# 1.21.1's Fabric API draws the HUD overlay through HudRenderCallback, unconditionally after the whole vanilla HUD;
+# 1.21.4's fabric-api moves to HudLayerRegistrationCallback with an IdentifiedLayer, and 1.21.11's to
+# HudElementRegistry.addLast on an Identifier.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# fabric-api 0.114.0 for 1.21.1 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
-# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+# 1.21.1's fabric-api registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager; 26.1's fabric-api renamed them
+# KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -66,7 +66,8 @@ common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 # Below 1.21.2 there is no SerializableChunkData.SectionData, so the chunk fixtures build
 # ChunkSnapshotSource.SectionData; the biome registry is read through RegistryAccess.registryOrThrow (renamed
 # lookupOrThrow at 1.21.2) and the section floor through LevelHeightAccessor.getMinSection (renamed getMinSectionY at
-# 1.21.2).
+# 1.21.2). The codec writes each section's light layers itself here, so the light fixtures keep their notes on a swapped
+# layer and the padding section.
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
 # Below 1.21.2 the Mob constructor reads level.getProfilerSupplier(), so a mob cannot be built against a null level;
@@ -103,7 +104,8 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
 
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
-# ServerLevel-taking hurtServer is 1.21.2 and above).
+# ServerLevel-taking hurtServer is 1.21.2 and above). Below 1.21.2 ChunkPos's class initializer reaches no registry, so
+# the test carries no note on keeping its ChunkPos fields out of static initialization.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
@@ -117,6 +119,10 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest
 # The geared mob double is built against the HeadlessLevel, since below 1.21.2 the Mob constructor reads
 # level.getProfilerSupplier() and cannot take a null level.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
+
+# Below 1.21.2 the registry loader adds any tag a context registry reads, so the worldgen load needs no primed item tags
+# and the test carries no note on priming them.
+common/src/test/java/world/thearchive/wdl/adapter/impl/VanillaWorldgenRegistriesTest.java
 
 # Below 1.21.2 ItemEnchantments.LEVEL_CODEC is intRange(0, 255) rather than the intRange(1, 255) that begins at 1.21.2,
 # so a level-0 enchantment round-trips through the disk codec below 1.21.2 and the wire-codec enchantments builder
@@ -143,8 +149,7 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/PlayerSinkItemDegradation
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
 # 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
-# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
-# assertions rely on -1.
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
 # Below 1.21.5 CompoundTag.getList takes a type id and getInt and ListTag.getCompound return the value itself (Optional
@@ -160,3 +165,11 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults). Below 1.21.5
 # CompoundTag has no store with a Codec, so the UUID is encoded through NbtOps directly.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
+
+# Below 1.21.2 there is no SerializableChunkData, so 1.21.1's copy drops 1.21.3's comment on that constructor's line;
+# the entries are 1.21.3's.
+neoforge/src/main/resources/META-INF/accesstransformer.cfg
+
+# Below 1.21.2 the worldgen reconstruction's loader creates any tag it reads on demand, so it needs no tags bound at
+# join, and the class Javadoc drops the auto-download paragraph that 1.21.3 and up carry.
+common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java

@@ -54,46 +54,20 @@ import world.thearchive.wdl.core.RecoveredCoverage;
 import world.thearchive.wdl.core.RimFace;
 import world.thearchive.wdl.core.TimingWindow;
 
-/**
- * Maintains the unsaved-container outline draw-set on the client tick: each tick it walks the loaded containers inside
- * the camera-centered clamp, pairs a double chest into one logical container, applies the pure
- * {@link OutlineClassifier} against the session captured-set and the prior-session recovered-set, stamps each
- * still-rimmed container's hue and exposed face, and buckets it into its section in the {@link OutlineDrawSet}. A
- * captured container drops out; the render reads the prebuilt draw-set and its stamped faces, touching no world state
- * of its own.
- *
- * <p>The expensive part, the per-chunk block-entity enumeration with its double-chest pairing and shape bounds, is
- * cached per chunk: a chunk is scanned when it first enters the clamp, its cached container geometry (and the reused
- * rim objects) is replayed each tick through the cheap distance filter and classification, and the chunk is evicted
- * when it leaves the clamp. Because there is no mixin-free per-block change signal, the cache is refreshed on a
- * staggered period instead, so a placed or broken container is picked up within a couple of seconds; a capture still
- * drops its rim immediately, since classification runs every tick and is never cached. Entity-borne containers (chest
- * vehicles and chested animals) move, so they are enumerated fresh each tick from their live bounding box and
- * classified by UUID; their rim sits on the box top face, since a vehicle in the open has no block neighbors to seal
- * against.
- */
 public final class OutlineTracker {
     private static final long[] NO_CELLS = new long[0];
-    // A reused scratch position for the seal-test neighbor reads, so no probe allocates. Client thread only.
+    // Client thread only.
     private static final BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int TIMING_WINDOW_TICKS = 100;
 
-    // Re-scan a cached chunk's block entities at most this often: the enumeration is the dominant tick cost on
-    // a dense base, so it is cached and only refreshed to pick up a placed or broken container, staggered by
-    // chunk so a whole region does not re-scan on one tick.
     private static final int RESCAN_PERIOD_TICKS = 30;
 
-    // Bound the per-tick block-entity enumeration: a cold cache (download start, a config toggle, or a dimension
-    // change) would otherwise scan the whole clamp square in one tick. Over-budget chunks fall to the next tick,
-    // so the bulk scan spreads while an incremental walk (a few new chunks a tick) still fills at once.
     private static final int MAX_RESCANS_PER_TICK = 32;
 
-    // A chested animal's bounding box is its full standing height, so rimming the box top would float the rim
-    // far above the chest, which hangs on the flanks at the animal's back. Across the chested equines the chest
-    // top sits near this fraction of the box height (donkey 0.74, mule 0.76, llama 0.70), so the rim box is
-    // capped there. A container vehicle keeps its true box: a boat or minecart is short enough that its top
-    // already meets the chest it carries.
+    // A chested animal's bounding box is its full standing height, so rimming the box top would float the rim far above
+    // the chest, which hangs on the flanks at the animal's back. Across the chested equines the chest top sits near
+    // this fraction of the box height, so the rim box is capped there.
     private static final double CHESTED_RIM_HEIGHT_FRACTION = 0.74;
     private static final double MERCHANT_RIM_HEIGHT_FRACTION = 0.45;
 
@@ -105,13 +79,10 @@ public final class OutlineTracker {
     private boolean errorLogged;
     private BobbyChunkFilter bobbyFilter = BobbyChunkFilter.INACTIVE;
 
-    /** The cached geometry of one logical block container: its reused rim, the ender flag, and the cheap keys. */
     private static final class CachedContainer {
         final OutlineRim rim;
         final boolean ender;
         final boolean bookshelf;
-        // The live block-entity type id at scan time, compared against the recorded capture type so a
-        // same-position block replacement re-rims the stale capture (Gate 2).
         final String liveTypeId;
         final long sectionKey;
         final long secondSectionKey;
@@ -133,7 +104,6 @@ public final class OutlineTracker {
         }
     }
 
-    /** One chunk's cached containers, the tick it is next due a re-scan, and the tick it was last in clamp. */
     private static final class ChunkContainers {
         final List<CachedContainer> containers = new ArrayList<>();
         long nextRescanTick;
@@ -145,25 +115,23 @@ public final class OutlineTracker {
         return drawSet;
     }
 
-    /** Empty the draw-set, the chunk cache, and the level anchor when not recording, so nothing lingers. */
+    /** Empty the draw-set, the chunk cache, and the level anchor. */
     public void clear() {
         drawSet.clear();
         chunkCache.clear();
         lastLevel = null;
     }
 
-    /** Injected once from Wdl.initialize so the outline scan skips Bobby's cached chunks. */
     public void useBobbyFilter(BobbyChunkFilter filter) {
         this.bobbyFilter = filter;
     }
 
     /**
-     * Rebuild the draw-set for the current camera position. Clears it first, so an off toggle or a zero distance leaves
-     * an empty query (no rim drawn). Runs on the client tick, the same thread the render reads on.
+     * Rebuild the draw-set for the current camera position. Clears it first, so an off toggle leaves an empty query (no
+     * rim drawn). Runs on the client tick, the same thread the render reads on.
      *
-     * <p>{@code config} carries the display treatment only, live from the settings; every gate on whether a rim may be
-     * drawn at all comes from {@code toggles}, which the caller has already reconciled against what the running
-     * download latched, so no rim is drawn for an axis this download is not capturing.
+     * <p>Every gate on whether a rim may be drawn at all comes from {@code toggles}, which the caller has already
+     * reconciled against what the running download latched.
      */
     public void tick(ClientLevel level, Vec3 cameraPos, OutlineConfig config, CaptureToggles toggles,
             CapturedContainers captured, RecoveredCoverage recovered) {
@@ -227,7 +195,7 @@ public final class OutlineTracker {
                         rescan(level, chunkSource, cx, cz, key, config, entry);
                         rescans++;
                     } else {
-                        entry.nextRescanTick = tickCounter; // over budget this tick; due again next tick
+                        entry.nextRescanTick = tickCounter;
                     }
                 }
                 entry.lastTouchedTick = tickCounter;
@@ -237,7 +205,6 @@ public final class OutlineTracker {
         evictUntouched();
     }
 
-    /** Drop cache entries the camera no longer covers (not visited this tick), bounding the cache to the clamp. */
     private void evictUntouched() {
         ObjectIterator<Long2ObjectMap.Entry<ChunkContainers>> entries = Long2ObjectMaps.fastIterator(chunkCache);
         while (entries.hasNext()) {
@@ -252,11 +219,10 @@ public final class OutlineTracker {
         entry.containers.clear();
         LevelChunk chunk = chunkSource.getChunk(cx, cz, ChunkStatus.FULL, false);
         if (chunk == null) {
-            entry.nextRescanTick = tickCounter + 1L; // not loaded yet; retry next tick so its containers appear
+            entry.nextRescanTick = tickCounter + 1L;
             return;
         }
         if (bobbyFilter.isBobbyChunk(chunk)) {
-            // Bobby-cached chunk: no live containers to outline. Rescan on the normal cadence, not next tick.
             entry.nextRescanTick = tickCounter + RESCAN_PERIOD_TICKS + Math.floorMod(key, RESCAN_PERIOD_TICKS);
             return;
         }
@@ -272,23 +238,14 @@ public final class OutlineTracker {
         AABB box;
         boolean ender = false;
         boolean bookshelf = false;
-        // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity and
-        // isTradeableMerchant) must have an enabled capture path, or its rim is a to-do the player can never
-        // clear. Contents arrive either on open, bound in LiveCaptureSession.captureOpenContainer (a container
-        // menu, or a merchant menu whose non-empty offers clear a tradeable villager's rim), or on interaction,
-        // recorded in InteractionCapture. The invariant is one-way; a capturable type need not be outlined.
-        // Three deliberate asymmetries: a chiseled bookshelf is outlined here but captured on interaction (it opens
-        // no menu and is not a BaseContainerBlockEntity), and its rim is suppressed in emit when interaction capture
-        // is off so it never becomes a stuck to-do; an ender chest reaches the save through the player tag rather than
-        // this position, so its rim is suppressed in emit on the toggle that write is gated on; a jukebox is
-        // captured on interaction but deliberately not outlined (not a BaseContainerBlockEntity, it falls
-        // through to the else return below).
+        // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity and isTradeableMerchant)
+        // must have an enabled capture path, or its rim is a to-do the player can never clear.
         if (blockEntity instanceof ChestBlockEntity) {
             BlockState state = level.getBlockState(pos);
             BlockPos partner = doubleChestPartner(level, pos, state);
             if (partner != null) {
                 if (pos.asLong() > partner.asLong()) {
-                    return; // the lower-keyed half caches the merged rim, so the double chest is one entry
+                    return;
                 }
                 cells = new long[] { pos.asLong(), partner.asLong() };
                 box = boxOf(level, pos).minmax(boxOf(level, partner));
@@ -309,7 +266,7 @@ public final class OutlineTracker {
             box = boxOf(level, pos);
         } else if (blockEntity instanceof ChiseledBookShelfBlockEntity) {
             if (BookshelfSlots.occupiedSlotMask(level.getBlockState(pos)) == 0) {
-                return; // an empty bookshelf holds nothing capturable, so it is not a candidate (mirrors the lectern)
+                return;
             }
             cells = new long[] { pos.asLong() };
             box = boxOf(level, pos);
@@ -318,9 +275,8 @@ public final class OutlineTracker {
             cells = new long[] { pos.asLong() };
             box = boxOf(level, pos);
         } else {
-            return; // not a container whose contents arrive only on open
+            return;
         }
-        // The hue is a placeholder restamped from the live classification each tick; the geometry is what is cached.
         OutlineRim rim = new OutlineRim(config.unscannedColor(), box, cells);
         long sectionKey = SectionPos.blockToSection(cells[0]);
         long secondSectionKey = cells.length > 1 ? SectionPos.blockToSection(cells[1]) : sectionKey;
@@ -329,9 +285,6 @@ public final class OutlineTracker {
                 (box.minZ + box.maxZ) * 0.5));
     }
 
-    // The block-entity registry id string, the key the chunk tag writes as "id" (via byNameCodec) and the same
-    // one the recorded capture type holds. Kept as a String, never the band-renamed id type (ResourceLocation
-    // vs Identifier), so this shared file stays band-portable.
     @SuppressWarnings("NullAway") // getKey is non-null for a live block entity's registered type
     private static String blockEntityTypeId(BlockEntity blockEntity) {
         return BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
@@ -353,12 +306,12 @@ public final class OutlineTracker {
                 long posKey = container.rim.cells()[0];
                 int occupiedMask = BookshelfSlots.occupiedSlotMask(level.getBlockState(BlockPos.of(posKey)));
                 if (occupiedMask == 0) {
-                    continue; // emptied or broken since the last rescan; nothing to flag, the rescan will evict it
+                    continue;
                 }
                 classification = OutlineClassifier.classifyBookshelf(occupiedMask,
                         captured.bookshelfCapturedSlots(posKey), recovered.bookshelfSavedSlots(posKey));
                 if (classification == OutlineClass.UNSAVED && !toggles.refreshesHotChunks()) {
-                    continue; // with the interaction-capture axis off the red rim is an unclearable to-do
+                    continue; // with the interaction-capture axis off the rim is an unclearable to-do
                 }
             } else {
                 classification = OutlineClassifier.classify(container.rim.cells(), container.liveTypeId, null,
@@ -400,15 +353,11 @@ public final class OutlineTracker {
                     BlockPos.asLong(Mth.floor(center.x), Mth.floor(center.y), Mth.floor(center.z)));
             OutlineRim rim = new OutlineRim(OutlineClassifier.hueFor(classification, config), rimBox(entity),
                     NO_CELLS);
-            rim.face(RimFace.TOP); // a vehicle in the open has no block neighbors to seal, so it rims its box top
+            rim.face(RimFace.TOP);
             drawSet.add(sectionKey, rim);
         }
     }
 
-    /**
-     * The rim box for a container entity: a chested animal's box drops to its chest and a tradeable villager's below
-     * its head, so a trading-hall roof or a trapdoor at head height does not hide the rim; a vehicle keeps its own box.
-     */
     private static AABB rimBox(Entity entity) {
         AABB box = entity.getBoundingBox();
         if (entity instanceof AbstractChestedHorse) {
@@ -420,16 +369,13 @@ public final class OutlineTracker {
         return box;
     }
 
-    /**
-     * {@code box} with its top capped to the chest height (see {@link #CHESTED_RIM_HEIGHT_FRACTION}), footprint kept.
-     */
     static AABB chestedRimBox(AABB box) {
         return cappedRimBox(box, CHESTED_RIM_HEIGHT_FRACTION);
     }
 
     /**
-     * {@code box} with its top dropped below the villager's head (see {@link #MERCHANT_RIM_HEIGHT_FRACTION}), footprint
-     * kept, so a trading-hall roof or a trapdoor at head height does not hide the rim.
+     * {@code box} with its top dropped below the villager's head (see {@link #MERCHANT_RIM_HEIGHT_FRACTION}), so a
+     * trading-hall roof or a trapdoor at head height does not hide the rim.
      */
     static AABB merchantRimBox(AABB box) {
         return cappedRimBox(box, MERCHANT_RIM_HEIGHT_FRACTION);
@@ -440,18 +386,13 @@ public final class OutlineTracker {
         return new AABB(box.minX, box.minY, box.minZ, box.maxX, top, box.maxZ);
     }
 
-    /** Whether {@code entity} is a container vehicle or a chested animal (the open-time entity-container set). */
     private static boolean isContainerEntity(Entity entity) {
-        // Below 1.21 getInventoryColumns is nonzero without a chest, so it cannot substitute for hasChest.
         return entity instanceof ContainerEntity
                 || (entity instanceof AbstractChestedHorse animal && animal.hasChest());
     }
 
     /**
-     * Whether {@code entity} is a merchant worth rimming: a wandering trader, or an adult villager whose synced
-     * profession is a real trading one. A nitwit, unemployed, or baby villager has no trades, so its rim could never
-     * clear. The profession and baby state ride the synced data, so this is client-derivable; the check is the exact
-     * idiom vanilla Villager uses.
+     * A nitwit, unemployed, or baby villager has no trades in ordinary play, so its rim could never clear.
      */
     private static boolean isTradeableMerchant(Entity entity) {
         if (entity instanceof WanderingTrader) {
@@ -464,7 +405,6 @@ public final class OutlineTracker {
         return false;
     }
 
-    /** The connected half of a double chest at {@code pos}, or {@code null} if it is single or not loaded. */
     private static @Nullable BlockPos doubleChestPartner(ClientLevel level, BlockPos pos, BlockState state) {
         if (!state.hasProperty(ChestBlock.TYPE) || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
             return null;
@@ -473,21 +413,13 @@ public final class OutlineTracker {
         return level.getBlockEntity(partner) instanceof ChestBlockEntity ? partner : null;
     }
 
-    /** The container's shape bounds in world coordinates, or its full cell when the shape is empty. */
     private static AABB boxOf(ClientLevel level, BlockPos pos) {
         VoxelShape shape = level.getBlockState(pos).getShape(level, pos);
         AABB local = shape.isEmpty() ? new AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0) : shape.bounds();
         return local.move(pos);
     }
 
-    /**
-     * The exposed face of a block container's rim, from the collision-shape seal test against each cell's neighbors in
-     * the preference order. Computed on the tick so the render reads a stamped face rather than probing the world each
-     * frame; the neighbors it seals against change only on the tick.
-     */
     private static RimFace faceOf(ClientLevel level, long[] cells) {
-        // The open-top chest is the overwhelming case, so settle it on one neighbor read; only a sealed top
-        // pays for the rest of the order, which RimFace.selectExposed decides.
         if (!isSealed(level, cells, Direction.UP)) {
             return RimFace.TOP;
         }
@@ -499,12 +431,10 @@ public final class OutlineTracker {
                 isSealed(level, cells, Direction.EAST));
     }
 
-    // A merged-box face is exposed when any cell is open in that direction, so a double chest with one half
-    // blocked still rims rather than vanishing (a completeness tool must not hide a reachable container); the rim
-    // then spans both cells and its blocked half clips behind that neighbor. A neighbor that is itself one of
-    // the cells is interior to the merged box, not an exterior face, and is skipped, without which a double
-    // chest's two end faces always read open, since each end cell's inward neighbor is the other half. Only a
-    // multi-cell box has such a neighbor, so a single container skips that test.
+    // A merged-box face is exposed when any cell is open in that direction, so a double chest with one half blocked
+    // still rims rather than vanishing (a completeness tool must not hide a reachable container). A neighbor that is
+    // itself one of the cells is interior to the merged box, not an exterior face, and is skipped, without which a
+    // double chest's two end faces always read open, since each end cell's inward neighbor is the other half.
     private static boolean isSealed(ClientLevel level, long[] cells, Direction direction) {
         for (long cell : cells) {
             int nx = BlockPos.getX(cell) + direction.getStepX();
@@ -530,7 +460,6 @@ public final class OutlineTracker {
         return false;
     }
 
-    /** Roll the per-tick build cost into a windowed log line. */
     private void recordTickTiming(long elapsedNanos) {
         if (tickTiming.record(elapsedNanos)) {
             int rims = 0;

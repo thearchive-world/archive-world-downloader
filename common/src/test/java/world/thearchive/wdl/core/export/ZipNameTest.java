@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The MC-free next-free naming and collision model for the export and resume-backup zips. */
 class ZipNameTest {
     @Test
     void exportWithoutCollisionTakesTheBareName(@TempDir Path saves) {
