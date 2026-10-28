@@ -33,15 +33,6 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the chunk read-merge: {@link ChunkMerge} carries forward every interaction-captured datum (a
- * block container's {@code "Items"}, a lectern's {@code "Book"}/{@code "Page"}, a jukebox disc's {@code "RecordItem"},
- * a beehive's {@code "bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the
- * write captured nothing of its own there, so a re-walk live-updates the terrain without wiping a chest an earlier
- * write archived, while a container this write captured is left exactly as that capture saw it. Pure
- * {@code CompoundTag} in/out, band-agnostic over the post-1.18 {@code "block_entities"} layout, matched by
- * {@code x/y/z}.
- */
 class ChunkMergeTest {
     private static CompoundTag chest(int x, int y, int z, String... itemIds) {
         return container("minecraft:chest", x, y, z, itemIds);
@@ -104,10 +95,9 @@ class ChunkMergeTest {
     }
 
     /**
-     * The on-disk carry-forward is the last store a same-position block replacement makes stale, and the one a
-     * placement's in-memory drop cannot reach. The match is position plus block-entity type, which a same-type
-     * replacement satisfies exactly, so a chest broken and replaced without ever being opened would otherwise inherit
-     * the archived contents of the chest that stood there.
+     * The match is position plus block-entity type, which a same-type replacement satisfies exactly, so a chest broken
+     * and replaced without ever being opened would otherwise inherit the archived contents of the chest that stood
+     * there.
      */
     @Test
     void aPositionThatWasReplacedCarriesNothingForward() {
@@ -121,7 +111,6 @@ class ChunkMergeTest {
                 "and the chest now standing there stays as empty as the client saw it");
     }
 
-    /** The other half: an untouched position still carries forward, so the guard is not a blanket refusal. */
     @Test
     void aPositionNoPlacementTouchedStillCarriesForward() {
         CompoundTag onDisk = chunkTagWith(chest(3, 64, 7, "minecraft:diamond"));
@@ -159,7 +148,7 @@ class ChunkMergeTest {
     @Test
     void freshTerrainIsAuthoritativeForBlockEntitiesRemovedSinceThePriorSession() {
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond"));
-        CompoundTag fresh = chunkTagWith(); // the chest was broken since; fresh terrain has no block entity
+        CompoundTag fresh = chunkTagWith();
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -207,7 +196,7 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedJukeboxDiscIsNotGhostedIntoTheReplacementChest() {
         CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat"));
-        CompoundTag fresh = chunkTagWith(chest(3, 65, 4)); // a chest now stands where the jukebox was
+        CompoundTag fresh = chunkTagWith(chest(3, 65, 4));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -230,7 +219,7 @@ class ChunkMergeTest {
     @Test
     void aRePlacedBeehiveKeepsTheFresherOccupants() {
         CompoundTag onDisk = chunkTagWith(beehiveWithBees(8, 72, 1, 3));
-        CompoundTag fresh = chunkTagWith(beehiveWithBees(8, 72, 1, 1)); // a populated hive placed this session
+        CompoundTag fresh = chunkTagWith(beehiveWithBees(8, 72, 1, 1));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -274,7 +263,7 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedContainerIsNewAndEmptyNotGhosted() {
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
-        CompoundTag fresh = chunkTagWith(barrel(10, 70, 20)); // a barrel now stands where the chest was
+        CompoundTag fresh = chunkTagWith(barrel(10, 70, 20));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -286,7 +275,7 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedLecternBookIsNotGhostedIntoTheReplacementChest() {
         CompoundTag onDisk = chunkTagWith(lectern(5, 64, 5, true, 7));
-        CompoundTag fresh = chunkTagWith(chest(5, 64, 5)); // a chest now stands where the lectern was
+        CompoundTag fresh = chunkTagWith(chest(5, 64, 5));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -296,8 +285,6 @@ class ChunkMergeTest {
 
     @Test
     void aRevisitReflectsPlacedBlockEntitiesAndCarriesTheSurvivingContainerForward() {
-        // A revisit re-flush drives the merge from the fresh capture: a barrel placed since the first flush is
-        // present (the change lands), and the chest that survived carries its earlier-saved contents forward.
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond"));
         CompoundTag fresh = chunkTagWith(chest(10, 70, 20), barrel(11, 70, 20));
 
@@ -320,9 +307,7 @@ class ChunkMergeTest {
         onDiskSections.add(onDiskSection);
         onDisk.put("sections", onDiskSections);
 
-        // The fresh chunk carries its own section at the same Y with no light layers on it. Without a section
-        // there the light assertion below iterates nothing and holds for any merge at all.
-        CompoundTag fresh = chunkTagWith(chest(10, 70, 20)); // re-walked, gate-false: no light tags
+        CompoundTag fresh = chunkTagWith(chest(10, 70, 20));
         ListTag freshSections = new ListTag();
         CompoundTag freshSection = new CompoundTag();
         freshSection.putByte("Y", (byte) 0);
@@ -342,7 +327,7 @@ class ChunkMergeTest {
     @Test
     void aChunkWithNoFreshBlockEntitiesDoesNothing() {
         CompoundTag onDisk = chunkTagWith(chest(1, 64, 1, "minecraft:diamond"));
-        CompoundTag fresh = new CompoundTag(); // no block_entities key at all
+        CompoundTag fresh = new CompoundTag();
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
     }
@@ -372,7 +357,6 @@ class ChunkMergeTest {
         return slots;
     }
 
-    /** The same slots sorted, for the cases whose subject is membership rather than order. */
     private static List<Integer> sortedSlotsOf(CompoundTag blockEntity) {
         List<Integer> slots = new ArrayList<>(slotsOf(blockEntity));
         slots.sort(null);
@@ -380,9 +364,8 @@ class ChunkMergeTest {
     }
 
     /**
-     * A crafter block entity. Both state keys are always present, because vanilla's saveAdditional writes them
-     * unconditionally and this mod's chunk capture serializes the client's own block entity: a fixture that omits them
-     * is a shape vanilla never produces, and a carry-forward tested against it proves nothing.
+     * A crafter block entity. Both state keys are always present, because vanilla's {@code saveAdditional} writes them
+     * unconditionally and this mod's chunk capture serializes the client's own block entity.
      */
     private static CompoundTag crafter(int x, int y, int z, int[] disabledSlots, int triggered) {
         CompoundTag blockEntity = blockEntity("minecraft:crafter", x, y, z);
@@ -410,8 +393,6 @@ class ChunkMergeTest {
 
     @Test
     void theChiseledBookshelfLiteralMatchesTheVanillaRegistryKey() {
-        // The per-slot union keys off this exact id string; a drift would silently restore the all-or-nothing
-        // rule for the one container the rule is wrong for, and every other test here would still pass.
         TestRegistries.frozen();
         assertEquals(ChunkMerge.CHISELED_BOOKSHELF_ID,
                 BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(BlockEntityType.CHISELED_BOOKSHELF).toString(),
@@ -420,8 +401,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfInsertUnionsWithTheBooksAlreadyOnDisk() {
-        // The bookshelf's capture unit is one slot, so the fresh side names only the book inserted since the last
-        // flush. Replacing wholesale would delete the books an earlier flush of this same download already saved.
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9, 3));
 
@@ -464,9 +443,6 @@ class ChunkMergeTest {
 
     @Test
     void anOnDiskBookshelfHoldingNoBooksCarriesNothingAndCountsNothing() {
-        // The union's own empty case. A shelf whose prior visit saved no book has nothing to contribute, so the
-        // carry must report that it carried nothing: counting it would tell the caller a block entity was
-        // recovered when the fresh insert is all there is.
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9, 3));
 
@@ -476,9 +452,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfOpenedThisWriteStillUnionsTheBooksAlreadyOnDisk() {
-        // A bookshelf reaches the same position set as an opened chest, since a confirmed insert routes to the
-        // container bundle the set is built from. Its fresh list is the one slot the player clicked, not the whole
-        // shelf, so treating the position as ground truth for every slot would drop every earlier-saved book.
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9, 3));
         LongSet opened = ChunkMerge.capturedPositions(List.of(new BlockPos(4, 64, 9)));
@@ -491,8 +464,6 @@ class ChunkMergeTest {
 
     @Test
     void aFreshBlockEntityWithNoCompletePositionCarriesNothing() {
-        // A position is what the merge matches on, reads occupancy under, and tests for a fresh open, so a block
-        // entity that names none is skipped whole rather than merged against a position it does not have.
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
         CompoundTag positionless = chest(10, 70, 20);
         positionless.remove("y");
@@ -505,8 +476,6 @@ class ChunkMergeTest {
 
     @Test
     void aPartlyEmptiedChestDoesNotResurrectTheItemsTakenOutOfIt() {
-        // The union is bookshelf-only on purpose: a chest's fresh list comes from an opened menu, which is ground
-        // truth for the whole container, so unioning it would put back what the player watched leave.
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
         CompoundTag fresh = chunkTagWith(chest(10, 70, 20, "minecraft:dirt"));
 
@@ -532,8 +501,6 @@ class ChunkMergeTest {
 
     @Test
     void anOpenAtOnePositionSaysNothingAboutItsNeighbor() {
-        // The set is spent per position, and a gate that spent it as a whole-chunk flag would drop the
-        // neighbor's archive. With contents in the exemption that cost is an un-opened container's items.
         CompoundTag onDisk = chunkTagWith(
                 chest(1, 64, 1, "minecraft:diamond"),
                 chest(2, 64, 2, "minecraft:emerald"));
@@ -549,8 +516,6 @@ class ChunkMergeTest {
 
     @Test
     void aCrafterKeepsItsOpenTimeStateAcrossAnyRewrite() {
-        // The open-time merge writes these beside "Items"; a re-walk that never re-opens the crafter re-captures
-        // it bare, so without the carry-forward the re-write drops the state the earlier open captured.
         CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
         CompoundTag fresh = chunkTagWith(freshCrafter(6, 64, 6));
 
@@ -565,9 +530,6 @@ class ChunkMergeTest {
 
     @Test
     void aReOpenedCrafterKeepsItsFresherState() {
-        // A crafter the player re-opened is captured from its menu, so its state is a real capture even where
-        // every value happens to read as the client default. Naming the position is what says so; without it
-        // the merge cannot tell a captured zero from a never-captured one and would carry the stale value.
         CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
         CompoundTag fresh = chunkTagWith(crafter(6, 64, 6, new int[] { 7 }, 0));
         LongSet reopened = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
@@ -595,8 +557,8 @@ class ChunkMergeTest {
 
     @Test
     void aBookTakenOutBetweenVisitsIsNotWrittenBackIntoAnEmptySlot() {
-        // Carrying a slot the saved block-state denies puts an item in the archive that the loaded world shows
-        // nowhere, cannot be taken out by hand, and destroys without a drop on the next insert there.
+        // Carrying a slot the saved block-state denies puts an item in the archive that the loaded world shows nowhere
+        // and destroys without a drop on the next insert there.
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9, 3));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
@@ -611,7 +573,6 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfWithNoRecordedOccupancyKeepsEveryOnDiskSlot() {
-        // The over-capture direction when the occupancy is unknown, which is what the no-argument merge means.
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9, 3));
 
@@ -626,7 +587,7 @@ class ChunkMergeTest {
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9, 3));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
-        occupancy.put(new BlockPos(11, 70, 2).asLong(), 0b1); // some other shelf entirely
+        occupancy.put(new BlockPos(11, 70, 2).asLong(), 0b1);
 
         assertEquals(1, ChunkMerge.merge(onDisk, fresh, occupancy, LongSet.of(), LongSet.of()));
         assertEquals(List.of(0, 1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
@@ -635,10 +596,9 @@ class ChunkMergeTest {
 
     @Test
     void aFreshStateCaptureIsNotOverwrittenEvenWhenItsPositionWasNotNamed() {
-        // The defensive half of the scalar carry: a fresh side already holding a non-default value is a real
-        // capture whatever the position set says, and must not be replaced by the older on-disk one. Both state
-        // keys are non-default here, so nothing at all is left for the carry to do and the count says so; with
-        // one of them at its default that key carries, and the count could not tell the two halves apart.
+        // The defensive half of the scalar carry. Both state keys are non-default here, so nothing at all is left for
+        // the carry to do and the count says so; with one of them at its default that key carries, and the count could
+        // not tell the two halves apart.
         CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
         CompoundTag fresh = chunkTagWith(crafter(6, 64, 6, new int[] { 8 }, 1));
 
@@ -654,9 +614,6 @@ class ChunkMergeTest {
 
     @Test
     void theOccupancyProducerAndTheMergeThatConsumesItAgreeOnTheirKeying() {
-        // The producer keys on a packed BlockPos and the merge re-packs one out of the saved tag. A silent
-        // disagreement between the two would send every bookshelf to the unknown-occupancy fallback, which
-        // looks exactly like the fix working and would restore the phantom this axis exists to prevent.
         RegistryAccess registries = TestRegistries.frozen();
         BlockPos pos = new BlockPos(4, 64, 9);
         BlockState shelf = Blocks.CHISELED_BOOKSHELF.defaultBlockState()

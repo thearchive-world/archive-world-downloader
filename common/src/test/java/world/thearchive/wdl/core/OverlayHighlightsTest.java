@@ -17,9 +17,8 @@ class OverlayHighlightsTest {
     @Test
     void savedAndNotCoveredIsTaggedSuspect() {
         Long2LongMap tags = OverlayHighlights.tag(new long[] { 1L, 2L, 3L }, new long[] { 2L });
-        // SUSPECT is 0, which is also the Long2LongMap default-return for an absent key, so a plain get() cannot
-        // tell "tagged suspect" from "not in the map". Assert the suspect chunks are real keys: a supplier that
-        // dropped them would leave them undrawn rather than suspect-toned.
+        // SUSPECT is 0, which is also the Long2LongMap default-return for an absent key, so a plain get() cannot tell
+        // "tagged suspect" from "not in the map".
         assertEquals(3, tags.size());
         assertTrue(tags.containsKey(1L));
         assertTrue(tags.containsKey(3L));
@@ -30,8 +29,6 @@ class OverlayHighlightsTest {
 
     @Test
     void everySavedChunkIsTaggedAndCoveredOnlyChunksAreDropped() {
-        // A covered chunk that is not saved (e.g. an in-range chunk the server never sent terrain for) is not
-        // drawn, so it is absent from the map; every saved chunk gets exactly one label.
         Long2LongMap tags = OverlayHighlights.tag(new long[] { 1L, 2L }, new long[] { 1L, 2L, 9L });
         assertEquals(2, tags.size());
         assertEquals(OverlayHighlights.COVERED, tags.get(1L));
@@ -54,7 +51,7 @@ class OverlayHighlightsTest {
     @Test
     void partitionSplitsSavedIntoCoveredAndSuspect() {
         long[] saved = { 1L, 2L, 3L };
-        long[] covered = { 2L, 3L, 99L }; // 99 is covered-not-saved and must be dropped
+        long[] covered = { 2L, 3L, 99L };
         OverlayHighlights.TonePartition partition = OverlayHighlights.partitionTones(saved, covered);
         long[] coveredChunks = partition.covered();
         long[] suspectChunks = partition.suspect();
@@ -81,8 +78,6 @@ class OverlayHighlightsTest {
 
     @Test
     void partitionAgreesWithTag() {
-        // The coexistence guarantee: the JourneyMap partition and the XaeroPlus per-chunk tag must label
-        // identically, both saved-anchored, so the two providers never disagree on a chunk's tone.
         long[] saved = { 1L, 2L, 3L, 4L };
         long[] covered = { 2L, 4L, 99L };
         OverlayHighlights.TonePartition partition = OverlayHighlights.partitionTones(saved, covered);

@@ -10,11 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-/**
- * The settings screen's headless edit model: a working copy seeded from the live config, a screen-level dirty flag,
- * per-key revert to default, the scalar-versus-gamerule revert split, and the parse-back-to-config path the commit
- * re-runs.
- */
 class SettingsDraftTest {
     private static WdlConfig live(String... keyValues) {
         Properties properties = new Properties();
@@ -107,7 +102,7 @@ class SettingsDraftTest {
     void commitStillHashesNonEmptySeedGarbageRatherThanHealing() {
         SettingsDraft draft = SettingsDraft.of(live("worldSeed", "42"));
 
-        draft.set("worldSeed", "hello"); // non-empty garbage is a deliberate text seed, hashed as vanilla does
+        draft.set("worldSeed", "hello");
 
         assertEquals((long) "hello".hashCode(), draft.toConfig().worldOutput().worldSeed(),
                 "non-empty seed text is hashed, not healed to the open-time value");
@@ -131,11 +126,9 @@ class SettingsDraftTest {
     void gameRuleOverrideIsWrittenOnlyWhenItDiffersFromTheCuratedValue() {
         SettingsDraft draft = SettingsDraft.of(WdlConfig.DEFAULTS);
 
-        // Curated keep_inventory is "true"; setting it to "true" writes no override (keeps the map sparse)
         draft.setGameRule("keep_inventory", "true", "true");
         assertFalse(draft.hasGameRuleOverride("keep_inventory"));
 
-        // Setting it away from curated writes the sparse override
         draft.setGameRule("keep_inventory", "false", "true");
         assertTrue(draft.hasGameRuleOverride("keep_inventory"));
         assertEquals("false", draft.toConfig().worldOutput().gameRuleOverrides().get("keep_inventory"));
@@ -161,9 +154,6 @@ class SettingsDraftTest {
 
     @Test
     void gameRuleIsModifiedKeysOffValueDifferenceNotOverridePresence() {
-        // A hand-written override equal to the curated value is seeded verbatim (parse never drops it), so the
-        // sparse entry is present even though the row sits at its default. Keying the revert affordance off
-        // presence would wrongly show the glyph; value-difference is the correct test.
         SettingsDraft draft = SettingsDraft.of(live("gamerule.keep_inventory", "true"));
 
         assertTrue(draft.hasGameRuleOverride("keep_inventory"), "the equal-to-curated override is in the seed");
@@ -221,9 +211,6 @@ class SettingsDraftTest {
 
     @Test
     void isAtDefaultsCountsPresentButEqualGameRuleOverrideAsNotDefault() {
-        // The gamerule half keys off override presence, not value difference, so a redundant override equal to
-        // the curated value still blocks at-defaults: revertAllToDefaults would drop that sparse line from the
-        // rendered file, so the reset button is not a no-op and must stay shown.
         SettingsDraft draft = SettingsDraft.of(live("gamerule.keep_inventory", "true"));
         assertTrue(draft.hasGameRuleOverride("keep_inventory"), "the equal-to-curated override is in the seed");
         assertFalse(draft.isAtDefaults(), "a present override blocks at-defaults because reset would remove the key");

@@ -14,20 +14,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * The headless guard for the production packet-state accumulator: inbound entity packet state is keyed by the int
- * entity id (the packet-layer key every post-spawn packet uses), bridged to the save-layer UUID, and held independent
- * of unload (a client removal is DISCARDED and tells you nothing, so there is no eviction at all). Beyond the spawn and
- * synced-data state proven for item frames, the generalization to every non-player type holds the post-spawn packets
- * too: position (so a moving entity re-homes to the chunk it ends in), equipment (merged by slot), passengers, and the
- * leash holder. State is drained one chunk at a time so the main thread can reconstruct and write whole chunks as they
- * leave the keep-hot window. Generic over the spawn/synced/equipment payloads so the bookkeeping is MC-free; the
- * production specialization binds the MC packet types.
- *
- * <p>Every read is scoped to one dimension, which is the other half of the key: chunk positions are shared between
- * dimensions, and the accumulator outlives a dimension change, so a bare chunk key is ambiguous exactly when the
- * download is most able to act on the wrong answer.
- */
 class EntityPacketAccumulatorTest {
     private static final UUID UUID_A = new UUID(0, 1);
     private static final UUID UUID_B = new UUID(0, 2);
@@ -58,7 +44,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void spawnSeedsThePositionOntoTheDrainRecord() {
-        // The spawn position is held so a never-moved entity reconstructs where it appeared; rotation rides too.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(1.5, 64.0, 2.5, 45f, 10f), "spawn-packet");
 
@@ -73,13 +58,11 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void syncedValuesMergeByKeyWithTheLatestWinning() {
-        // SetEntityData carries a diff keyed by the accessor id; a later value for an accessor overwrites the
-        // earlier (vanilla's assignValues semantics), so a frame whose item changes ends at the latest item.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "spawn-packet");
         accumulator.recordData(7, 8, "item=apple");
         accumulator.recordData(7, 9, "rotation=2");
-        accumulator.recordData(7, 8, "item=sword"); // the framed item was swapped
+        accumulator.recordData(7, 8, "item=sword");
 
         List<String> synced = accumulator.dropChunk(OVERWORLD, CHUNK).get(0).synced();
 
@@ -91,13 +74,11 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void equipmentMergesBySlotWithTheLatestWinning() {
-        // SetEquipment is applied per slot the way the client does (setItemSlot), so a re-equip of one slot
-        // overwrites only that slot; the merge mirrors the synced diff but on its own channel.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "mob");
         accumulator.recordEquipment(7, 0, "head=helmet");
         accumulator.recordEquipment(7, 1, "chest=plate");
-        accumulator.recordEquipment(7, 0, "head=crown"); // the head slot was re-equipped
+        accumulator.recordEquipment(7, 0, "head=crown");
 
         List<String> equipment = accumulator.dropChunk(OVERWORLD, CHUNK).get(0).equipment();
 
@@ -109,20 +90,16 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void passengersAreReplacedWholesale() {
-        // SetPassengers is the full passenger list (the client ejects then re-seats), so a later packet replaces
-        // the prior list rather than merging into it.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
         accumulator.recordPassengers(7, new int[] { 10, 11 });
-        accumulator.recordPassengers(7, new int[] { 12 }); // re-seated
+        accumulator.recordPassengers(7, new int[] { 12 });
 
         assertArrayEquals(new int[] { 12 }, accumulator.dropChunk(OVERWORLD, CHUNK).get(0).passengers());
     }
 
     @Test
     void theLeashHolderIsRecordedAndDefaultsToNone() {
-        // SetEntityLink carries the holder int id; absent any link the holder is 0, matching vanilla's
-        // delayedLeashHolderId != 0 has-a-leash convention.
         EntityPacketAccumulator<String, String, String> unleashed = accumulator();
         unleashed.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "mob");
         assertEquals(0, unleashed.dropChunk(OVERWORLD, CHUNK).get(0).leashHolderId(), "no link seen, no leash");
@@ -135,8 +112,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aRepositionedEntityReHomesToTheChunkItEndsIn() {
-        // Movement is the gap the generalization closes: an item frame never moves, but a mob walks. Its chunk
-        // must follow the move/teleport/position-sync so the privacy gate and the drain key on where it ends.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(1.0, 64.0, 2.0, 0f, 0f), "mob");
 
@@ -152,8 +127,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void positionOfReturnsTheCurrentPositionAndNullForUnknown() {
-        // The MC specialization reads this to resolve a relative move (a delta off the current base) into
-        // an absolute position before re-homing; an untracked id yields null so a stray move is ignored.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(1.0, 64.0, 2.0, 30f, 0f), "mob");
 
@@ -166,8 +139,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void postSpawnPacketsForAnUnknownIdAreIgnored() {
-        // A post-spawn packet can arrive for an id we never spawned (a non-tracked entity, or one whose spawn we
-        // missed); none of them may conjure an entry with no spawn payload to reconstruct from.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.recordData(7, 8, "item=apple");
         accumulator.recordEquipment(7, 0, "head=helmet");
@@ -181,8 +152,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void tracksReportsWhetherAnIdHasBeenSpawned() {
-        // The tee gates the per-value SetEntityData merge on this so a non-tracked entity's synced update costs
-        // the Netty thread one lookup, not one per value (the Netty path does almost nothing).
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "spawn-packet");
 
@@ -192,8 +161,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void drainingOneChunkLeavesTheOthersIntact() {
-        // Whole-chunk drain is how the main thread writes a chunk's entities as it leaves the keep-hot window;
-        // it must take only that chunk, so a still-hot chunk's held entities are not written early or lost.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "in-chunk");
         accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "other-chunk");
@@ -205,9 +172,8 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void settingPassengersReHomesTheRidersToTheVehiclesChunk() {
-        // A rider is positioned client-side at its vehicle, so the server need not move it; left alone its
-        // accumulated chunk would lag the vehicle and they would drain in different batches and fail to nest.
-        // Re-homing each tracked rider to the vehicle's chunk keeps them together for a whole-chunk drain.
+        // A rider is positioned client-side at its vehicle, so the server need not move it; left alone its accumulated
+        // chunk would lag the vehicle and they would drain in different batches and fail to nest.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
         accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "rider"); // a different chunk at spawn
@@ -220,8 +186,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void movingTheVehicleCarriesItsRidersToTheNewChunk() {
-        // When the vehicle re-homes on a move, its riders follow, so they stay in one drain batch and keep
-        // nesting after the vehicle has driven across a chunk boundary.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
         accumulator.spawn(2, UUID_B, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "rider");
@@ -235,16 +199,10 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aPassengerArrivingAfterItsVehiclesSetPassengersIsNotReHomed() {
-        // SetPassengers can arrive before the rider's AddEntity (out of order on the wire). reHomePassengers
-        // skips a not-yet-tracked rider id, and the later rider spawn is not retroactively re-homed, so the rider
-        // keeps its own chunk and saves standalone instead of nested. No data loss (the rider is still saved);
-        // pinned here as the documented edge, not a fix (a retroactive re-home would need a
-        // reverse rider-to-vehicle index for a non-loss case). The in-order spawn-then-SetPassengers case nests,
-        // covered by settingPassengersReHomesTheRidersToTheVehiclesChunk.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
-        accumulator.recordPassengers(1, new int[] { 2 }); // rider id 2 not spawned yet: the re-home finds nothing
-        accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "rider"); // arrives later, a different chunk
+        accumulator.recordPassengers(1, new int[] { 2 });
+        accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "rider");
 
         assertEquals(Set.of(CHUNK, FAR), accumulator.chunks(OVERWORLD),
                 "the late rider is not re-homed to the vehicle");
@@ -265,7 +223,7 @@ class EntityPacketAccumulatorTest {
         assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "the whole stack joined the vehicle's chunk");
         List<PacketEntity<String, String, String>> drained = accumulator.dropChunk(OVERWORLD, CHUNK);
         assertEquals(3, drained.size(), "so all three drain in one batch and nest");
-        // Each list is one id long, which is the shape that lets a worklist wrapping the held array rather than
+        // The mount's list is one id long, which is the shape that lets a worklist wrapping the held array rather than
         // copying it overwrite the vehicle's own passengers in place with its rider's.
         assertArrayEquals(new int[] { 2 }, passengersOf(drained, 1), "the walk left the vehicle's own list alone");
         assertArrayEquals(new int[] { 3 }, passengersOf(drained, 2), "and the mount's, which it walked through");
@@ -273,7 +231,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void everyRiderOfOneVehicleFollowsIt() {
-        // A vehicle seats more than one (a boat holds two), so a first-rider-only walk strands the rest.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "boat");
         accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "mount");
@@ -315,17 +272,13 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aReusedIdReplacesThePriorEntityAndClearsAllItsState() {
-        // The server reuses an int id once the prior entity at it is gone. A fresh spawn for that id is a new
-        // identity (new UUID), and all its post-spawn state must start empty: the old entity's item, equipment,
-        // passengers, and leash must not bleed into the new one. This is also why no removal handling is needed,
-        // a new spawn supersedes by id.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(1, 1, 1, 0f, 0f), "old");
         accumulator.recordData(7, 8, "item=apple");
         accumulator.recordEquipment(7, 0, "head=helmet");
         accumulator.recordPassengers(7, new int[] { 10 });
         accumulator.recordLeash(7, 42);
-        accumulator.spawn(7, UUID_B, CHUNK, new EntityPos(2, 2, 2, 0f, 0f), "new"); // id 7 reused
+        accumulator.spawn(7, UUID_B, CHUNK, new EntityPos(2, 2, 2, 0f, 0f), "new");
 
         PacketEntity<String, String, String> drained = accumulator.dropChunk(OVERWORLD, CHUNK).get(0);
 
@@ -339,11 +292,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aSpawnBeyondTheTrackingCeilingIsSkippedAndCounted() {
-        // No eviction exists by design, so a server minting fresh ids forever (a spawn flood, or hours at a
-        // farm with the player stationary and the hot chunks never draining) would otherwise grow the map
-        // without bound. At the ceiling a NEW id is skipped, counted, and never drained; a legitimate capture
-        // never reaches the ceiling. The fed-spawn count still ticks so the reconciliation stays honest about
-        // what arrived.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         for (int id = 0; id < EntityPacketAccumulator.MAX_TRACKED_ENTITIES; id++) {
             accumulator.spawn(id, new UUID(1, id), CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "spawn");
@@ -361,8 +309,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aReusedIdStillReplacesAtTheTrackingCeiling() {
-        // Replacement does not grow the map, so the id-reuse supersede semantics must survive the ceiling:
-        // blocking it would freeze stale state for an id the server has already recycled.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         for (int id = 0; id < EntityPacketAccumulator.MAX_TRACKED_ENTITIES; id++) {
             accumulator.spawn(id, new UUID(1, id), CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "spawn");
@@ -378,11 +324,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void anEntityOfOneDimensionIsInvisibleToTheSameChunkKeyInAnother() {
-        // The whole position space is shared between dimensions, so the same key names a chunk in each. A read
-        // that ignored the dimension would hand the world the player entered an entity of the world they left,
-        // to be written at that key into the wrong folder; the collision is not exotic, since a nether key is
-        // one eighth the magnitude of the overworld coordinates it maps to and lands where a player who
-        // explored spawn has already captured.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "left-behind");
         accumulator.enterDimension(NETHER);
@@ -399,8 +340,7 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aRespawnIntoTheSameDimensionOrphansNothing() {
-        // A death sends the same dimension marker a portal does. Keying on the world rather than on a count of
-        // markers is what keeps a death from orphaning every entity held around the player.
+        // A death sends the same dimension marker a portal does.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "mob");
 
@@ -412,9 +352,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void everyDimensionHeldForIsReportedSoTheFinishCanSettleThemSeparately() {
-        // The finish has to ask a per-dimension question of what it is holding, namely whether THAT dimension
-        // captured the terrain the entity stands on, which decides whether the drop is the privacy gate doing
-        // its job or an entity that was writable and went unwritten. A bulk drain could not ask it.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "this-world");
         accumulator.enterDimension(NETHER);
@@ -432,9 +369,6 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aRiderHeldForAnotherDimensionIsNotReHomedToTheVehicle() {
-        // Ids are recycled across a dimension change, so a vehicle of one world can name a passenger id the
-        // stream has since given to an entity of another. Re-homing on the id alone would move that entity into
-        // the other world's chunk, where it would drain and be written under the wrong dimension.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
         // This world's entity is seated under the recycled id, so descending past that id would re-home an

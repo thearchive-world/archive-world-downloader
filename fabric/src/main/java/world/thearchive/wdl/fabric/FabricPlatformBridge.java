@@ -27,12 +27,6 @@ import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
-/**
- * Fabric {@link AbstractPlatformBridge}: maps the loader-specific hooks (keybind, ticks, disconnect, config directory,
- * command registration) to Fabric's APIs. Constructed directly by {@code WdlFabricClient} and handed to
- * {@code Wdl.initialize}; every Fabric / vanilla call happens inside the methods (run from the client thread), never
- * the constructor.
- */
 public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
@@ -60,7 +54,7 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     protected @Nullable AbstractWidget disconnectButton(Screen pauseScreen) {
-        return pauseScreen instanceof PauseScreen pause ? pause.disconnectButton : null; // widened
+        return pauseScreen instanceof PauseScreen pause ? pause.disconnectButton : null;
     }
 
     @Override

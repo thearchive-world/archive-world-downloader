@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-/** The strictly-newer decision: client-side re-filter, newest by date with a semver tie-break. */
 class LatestReleaseTest {
     private static final SemVer RUNNING = SemVer.parse("1.0.0").orElseThrow();
 
@@ -77,8 +76,7 @@ class LatestReleaseTest {
 
     @Test
     void picksTheNewestByDatePublished() {
-        // The chosen algorithm is date-first: a higher semver published earlier
-        // loses to a later backport, and the strictly-newer guard keeps that residual to under-notification.
+        // A higher semver published earlier loses to a later backport.
         Optional<String> newer = LatestRelease.newerThan("fabric", "1.21.11", RUNNING,
                 List.of(listed("3.9.5", "2026-01-01T00:00:00Z"), listed("3.9.4", "2026-02-01T00:00:00Z")));
 

@@ -27,16 +27,16 @@
 # Registries.tagsDirPath.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.100.8+1.20.6 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.20.6's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.100.8+1.20.6 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands.
+# On 1.20.6's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -76,15 +76,21 @@ common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 # 1.20.6's adapter/impl has no ItemStackSanitizer, so serialize encodes each offer's sell item directly, without
 # repairing a disk-codec-invalid component before the write.
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
+# Below 1.21.1 a client merchant with a trade table generates a trade list when asked (getOffers has no client
+# check, and the entity write asks), so the class Javadoc names that invention and the carry-forward it defeats;
+# 1.21.1 refuses both on the client.
+common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferScrub.java
+# Below 1.21 a vehicle unseats its passengers when it changes dimension, so a dimension rebind, like a respawn,
+# leaves the player unseated, and the tracker's reset names no re-latch of the open-inventory request.
+common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
+# Below 1.21 getInventoryColumns answers nonzero for a chested horse with or without its chest, so the container
+# entity test keeps its note against substituting it for hasChest.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 
 # The chunk fixtures build the mod's own ChunkSnapshotSource.SectionData (vanilla has no
 # SerializableChunkData.SectionData below 1.21.2) and read the biome registry via registryOrThrow and the section floor
 # via getMinSection.
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
-
-# Below 1.21.2 the Mob constructor reads level.getProfilerSupplier(), so a mob cannot be built against a null level;
-# this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler.
-common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 
 # Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a
 # RegistryLookup, not a Registry, below 1.21.2).
@@ -151,10 +157,6 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/PlayerSinkItemDegradation
 # LeashData codec-throw this test guards against does not arise on 1.20.6.
 common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
 
-# The reflection-accessor javadoc names CaptureAnchorTest, not EntitySinkLeashDegradationTest, as the sibling
-# reaching Entity.vehicle the same way, since EntitySinkLeashDegradationTest does not exist on 1.20.6.
-common/src/test/java/world/thearchive/wdl/adapter/impl/SaddleCaptureTest.java
-
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
 # shared overlay's render entry point takes a float.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
@@ -190,7 +192,8 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
 
 # The polygon builder binds the 1.9 JourneyMap model package (journeymap.client.api.model) for MapPolygon,
-# MapPolygonWithHoles and ShapeProperties.
+# MapPolygonWithHoles and ShapeProperties. Its fill opacity carries no note matching it to the sibling overlay's alpha,
+# since JourneyMap 5.10.3, a 1.9-API build, draws the fill 0.4 above the opacity it is given.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
@@ -215,13 +218,12 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
 # 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
-# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
-# assertions rely on -1.
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound and getList return the value, where from 1.21.5 they
 # return Optional and dev reads through the defaulting getCompoundOrEmpty and getListOrEmpty, and dev's getIntOr becomes
-# a local intOr helper because getInt reads an absent key back as a real zero while the assertions rely on -1.
+# a local intOr helper because getInt reads an absent key back as a real zero.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
@@ -238,3 +240,11 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMount
 # ListTag accessors getCompound, getList and getInt return the value, where from 1.21.5 they return Optional and dev
 # reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getIntOr.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
+
+# From 1.20.2 a proxy's backend switch ends the download, and the Flashback repository carries no line below 1.21, so
+# the rider re-home test carries no recycled-id note, where 1.21.1 and up name a Flashback replay of such a switch.
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketAccumulatorTest.java
+
+# From 1.20.2 a proxy's backend switch ends the download, and the Flashback repository carries no line below
+# 1.21, so the re-home guard carries no comment, where 1.21.1 and up name a Flashback replay of such a switch.
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketAccumulator.java
